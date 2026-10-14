@@ -335,9 +335,9 @@ public partial class MainWindow : FluentWindow
             return "";
 
         return " Avg per account: token " + AccountEntity.Seconds((int)(token / count)) +
-               " В· connect " + AccountEntity.Seconds((int)(connect / count)) +
-               " В· folders " + AccountEntity.Seconds((int)(folders / count)) +
-               " В· store " + AccountEntity.Seconds((int)(store / count)) + ".";
+               " · connect " + AccountEntity.Seconds((int)(connect / count)) +
+               " · folders " + AccountEntity.Seconds((int)(folders / count)) +
+               " · store " + AccountEntity.Seconds((int)(store / count)) + ".";
     }
 
     /// <summary>
@@ -1717,9 +1717,9 @@ public partial class MainWindow : FluentWindow
             var answer = System.Windows.MessageBox.Show(
                 this,
                 "A message is still being sent." + Environment.NewLine + Environment.NewLine +
-                "Yes вЂ” wait for it to finish and then close." + Environment.NewLine +
-                "No вЂ” cancel the send and close now." + Environment.NewLine +
-                "Cancel вЂ” keep the program open.",
+                "Yes — wait for it to finish and then close." + Environment.NewLine +
+                "No — cancel the send and close now." + Environment.NewLine +
+                "Cancel — keep the program open.",
                 "Message is being sent",
                 System.Windows.MessageBoxButton.YesNoCancel,
                 System.Windows.MessageBoxImage.Question);
