@@ -1,0 +1,22 @@
+# Build output
+bin/
+obj/
+.vs/
+*.user
+*.suo
+
+# Local publish folder; releases are built by GitHub Actions
+dist-alpha/
+
+# Runtime state the program writes next to the exe
+data/DB/
+data/attachments/
+data/webview2/
+data/runtime/WebView2Loader.dll
+*.log
+*.log.previous-crash
+
+# Working copies kept during development, not part of the product
+*.working.bak
+AI_DEVELOPMENT_NOTES/
+tools/

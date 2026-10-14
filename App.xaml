@@ -1,0 +1,34 @@
+<Application x:Class="ZennoVibe.MailClient.App"
+
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+
+             ShutdownMode="OnMainWindowClose">
+
+    <Application.Resources>
+
+        <ResourceDictionary>
+
+            <ResourceDictionary.MergedDictionaries>
+
+                <ResourceDictionary Source="Themes/CarbonPalette.xaml" />
+
+                <ui:ThemesDictionary Theme="Dark" />
+
+                <ui:ControlsDictionary />
+
+                <ResourceDictionary Source="Themes/GlassStyles.xaml" />
+
+                <ResourceDictionary Source="Themes/MatrixAccents.xaml" />
+
+            </ResourceDictionary.MergedDictionaries>
+
+        </ResourceDictionary>
+
+    </Application.Resources>
+
+</Application>
+

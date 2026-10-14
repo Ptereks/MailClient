@@ -1,0 +1,73 @@
+# Builds the release binary on a GitHub-hosted Windows runner from the tagged source,
+# so anyone can match a published MailClient.exe to the commit it was built from.
+#
+# Release a version:  git tag v1.11.8 && git push origin v1.11.8
+# The tag must equal <Version> in ZennoVibe.MailClient.csproj.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out the tagged source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Check that the tag matches the project version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}".TrimStart("v")
+          [xml]$project = Get-Content ZennoVibe.MailClient.csproj
+          $version = ($project.Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1).Trim()
+          if ($tag -ne $version) {
+            throw "Tag v$tag does not match <Version>$version</Version> in ZennoVibe.MailClient.csproj."
+          }
+          "Building MailClient $version from $env:GITHUB_SHA"
+
+      - name: Publish (Release, win-x64, single file)
+        run: dotnet publish ZennoVibe.MailClient.csproj -c Release -p:ContinuousIntegrationBuild=true
+
+      - name: Package and hash
+        shell: pwsh
+        run: |
+          $name = "MailClient-${{ github.ref_name }}-win-x64"
+          New-Item -ItemType Directory -Force out | Out-Null
+          Compress-Archive -Path dist-alpha\* -DestinationPath "out\$name.zip"
+          Copy-Item dist-alpha\MailClient.exe out\MailClient.exe
+          $files = Get-ChildItem out -File
+          $lines = $files | ForEach-Object {
+            "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name
+          }
+          $lines | Set-Content out\SHA256SUMS.txt -Encoding ascii
+          Get-Content out\SHA256SUMS.txt
+
+      - name: Create the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          generate_release_notes: true
+          body: |
+            Built by GitHub Actions from tag `${{ github.ref_name }}`, commit `${{ github.sha }}`.
+            Build log: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            **Verify the download** (PowerShell):
+
+            ```
+            Get-FileHash .\MailClient.exe -Algorithm SHA256
+            ```
+
+            Compare with `SHA256SUMS.txt`. The zip contains `MailClient.exe`, `README.txt` and the `data\` templates.
+            Requires the .NET 8 Desktop Runtime (x64).

@@ -1,0 +1,987 @@
+<ui:FluentWindow x:Class="ZennoVibe.MailClient.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:local="clr-namespace:ZennoVibe.MailClient"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="Yahoo AOL Mail Client"
+        Width="1760"
+        Height="1000"
+        MinWidth="1104"
+        MinHeight="736"
+        WindowStartupLocation="CenterScreen"
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="None"
+        Icon="/Assets/AppIcon.ico"
+        Background="{StaticResource CarbonGlassCard}">
+
+    <Grid Background="Transparent"
+          PreviewKeyDown="MainWindow_PreviewKeyDown">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0"
+                     Title="Yahoo AOL Mail Client"
+                     ShowHelp="False">
+            <ui:TitleBar.Icon>
+                <ui:ImageIcon Source="pack://application:,,,/Assets/AppIcon.ico"
+                              Width="16"
+                              Height="16" />
+            </ui:TitleBar.Icon>
+            <ui:TitleBar.TrailingContent>
+                <TextBlock x:Name="VersionTextBlock"
+                           VerticalAlignment="Center"
+                           Margin="0,0,4,0"
+                           FontSize="12"
+                           Foreground="{StaticResource CarbonMuted}"
+                           IsHitTestVisible="False" />
+            </ui:TitleBar.TrailingContent>
+        </ui:TitleBar>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <!-- MinWidth keeps "New group / Move selected / Delete group" readable side by side. -->
+                <ColumnDefinition x:Name="AccountsPaneColumn" Width="25*" MinWidth="400" />
+                <ColumnDefinition Width="Auto" />
+                <!-- Holds the fixed folders column plus the mail pane, so the splitter
+                     resizes accounts against both and can never collapse the folders. -->
+                <ColumnDefinition x:Name="MailPaneColumn" Width="75*" MinWidth="590" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource FluentSidebarColumn}">
+                <DockPanel>
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                        <ui:Button x:Name="SyncAllAccountsButton"
+                                   DockPanel.Dock="Left"
+                                   Style="{StaticResource IconToolButtonLarge}"
+                                   ToolTip="Sync all accounts"
+                                   Click="SyncAllAccounts_Click">
+                            <ui:SymbolIcon Symbol="ArrowSync24"
+                                           FontSize="20"
+                                           Foreground="#FFFFFF" />
+                        </ui:Button>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <ui:Button x:Name="AddAccountButton"
+                                       Style="{StaticResource IconToolButton}"
+                                       ToolTip="Add accounts (import)"
+                                       Click="AddAccount_Click">
+                                <ui:SymbolIcon Symbol="Add24"
+                                               FontSize="16"
+                                               Foreground="#FFFFFF" />
+                            </ui:Button>
+                            <ui:Button x:Name="DeleteAccountButton"
+                                       Style="{StaticResource IconToolButton}"
+                                       ToolTip="Delete selected account"
+                                       Click="DeleteAccount_Click">
+                                <ui:SymbolIcon Symbol="Delete24"
+                                               FontSize="16"
+                                               Foreground="#FFFFFF" />
+                            </ui:Button>
+                            <ui:Button x:Name="SaveAccountsButton"
+                                       Style="{StaticResource IconToolButton}"
+                                       ToolTip="Save all accounts from the database to a file. Column order and delimiter stay exactly as configured in Settings."
+                                       Click="SaveAccounts_Click">
+                                <ui:SymbolIcon Symbol="Save24"
+                                               FontSize="16"
+                                               Foreground="#FFFFFF" />
+                            </ui:Button>
+                        </StackPanel>
+                        <TextBlock Text="ACCOUNTS"
+                                   Style="{StaticResource SectionTitleText}"
+                                   Margin="4,0,4,0"
+                                   VerticalAlignment="Center" />
+                    </DockPanel>
+                    <Grid DockPanel.Dock="Top"
+                          Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ui:Button x:Name="NewGroupButton"
+                                   Grid.Column="0"
+                                   Content="New group"
+                                   Style="{StaticResource ActionButton}"
+                                   Padding="9,3"
+                                   Margin="0,0,6,0"
+                                   ToolTip="Create an empty group or a group from selected accounts"
+                                   Click="NewGroup_Click" />
+                        <ui:Button x:Name="MoveAccountsButton"
+                                   Grid.Column="1"
+                                   Content="Move selected"
+                                   Style="{StaticResource ActionButton}"
+                                   Padding="9,3"
+                                   Margin="0,0,6,0"
+                                   ToolTip="Move selected accounts to a group or Ungrouped"
+                                   Click="MoveSelectedAccounts_Click" />
+                        <ui:Button x:Name="DeleteGroupButton"
+                                   Grid.Column="2"
+                                   Content="Delete group"
+                                   Style="{StaticResource ActionButton}"
+                                   Padding="9,3"
+                                   ToolTip="Choose a group to delete"
+                                   Click="DeleteGroup_Click" />
+                    </Grid>
+                    <Grid DockPanel.Dock="Top">
+                        <TextBox x:Name="AccountFilterTextBox"
+                                 Style="{StaticResource SidebarFilterTextBox}"
+                                 Padding="30,6,8,6"
+                                 ToolTip="Filter by email"
+                                 TextChanged="AccountFilterTextBox_TextChanged" />
+                        <ui:SymbolIcon Symbol="Search24"
+                                       FontSize="15"
+                                       Foreground="{StaticResource CarbonMuted}"
+                                       HorizontalAlignment="Left"
+                                       VerticalAlignment="Center"
+                                       Margin="8,0,0,8"
+                                       IsHitTestVisible="False" />
+                    </Grid>
+                    <ListBox x:Name="AccountsListBox"
+                             SelectionMode="Extended"
+                             ToolTip="Use the sync icon to update an account. Right-click for groups and more."
+                             PreviewMouseLeftButtonDown="AccountsListBox_PreviewMouseLeftButtonDown"
+                             PreviewMouseRightButtonDown="AccountsListBox_PreviewMouseRightButtonDown"
+                             PreviewKeyDown="AccountsListBox_PreviewKeyDown"
+                             VirtualizingPanel.IsVirtualizing="False"
+                             SelectionChanged="AccountsListBox_SelectionChanged"
+                             MouseDoubleClick="AccountsListBox_MouseDoubleClick">
+                        <ListBox.GroupStyle>
+                            <GroupStyle>
+                                <GroupStyle.ContainerStyle>
+                                    <Style TargetType="{x:Type GroupItem}">
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="{x:Type GroupItem}">
+                                                    <Grid>
+                                                        <Grid.RowDefinitions>
+                                                            <RowDefinition Height="Auto" />
+                                                            <RowDefinition Height="Auto" />
+                                                        </Grid.RowDefinitions>
+                                                        <Grid Margin="2,4,2,2">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <ToggleButton x:Name="GroupToggle"
+                                                                          Grid.Column="0"
+                                                                          IsChecked="{Binding Name.IsExpanded, Mode=OneTime}"
+                                                                          Tag="{Binding Name}"
+                                                                          Loaded="AccountGroupToggle_Loaded"
+                                                                          Click="AccountGroupToggle_Click"
+                                                                          Background="Transparent"
+                                                                          BorderThickness="0"
+                                                                          HorizontalContentAlignment="Stretch">
+                                                                <ToggleButton.Template>
+                                                                    <ControlTemplate TargetType="{x:Type ToggleButton}">
+                                                                        <Border Background="{TemplateBinding Background}"
+                                                                                CornerRadius="5"
+                                                                                Padding="4,3">
+                                                                            <Grid>
+                                                                                <ContentPresenter Margin="0,0,22,0"
+                                                                                                  VerticalAlignment="Center" />
+                                                                                <ui:SymbolIcon x:Name="Chevron"
+                                                                                               Symbol="ChevronRight24"
+                                                                                               HorizontalAlignment="Right"
+                                                                                               VerticalAlignment="Center"
+                                                                                               Foreground="{StaticResource CarbonSubtle}"
+                                                                                               FontSize="15" />
+                                                                            </Grid>
+                                                                        </Border>
+                                                                        <ControlTemplate.Triggers>
+                                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                                <Setter Property="Background"
+                                                                                        Value="{StaticResource CarbonHover}" />
+                                                                            </Trigger>
+                                                                            <Trigger Property="IsChecked" Value="True">
+                                                                                <Setter TargetName="Chevron"
+                                                                                        Property="Symbol"
+                                                                                        Value="ChevronDown24" />
+                                                                            </Trigger>
+                                                                        </ControlTemplate.Triggers>
+                                                                    </ControlTemplate>
+                                                                </ToggleButton.Template>
+                                                                <DockPanel LastChildFill="True">
+                                                                    <TextBlock DockPanel.Dock="Right"
+                                                                               Text="{Binding Name.AccountCount}"
+                                                                               Margin="8,0,0,0"
+                                                                               Foreground="{StaticResource CarbonSubtle}"
+                                                                               VerticalAlignment="Center" />
+                                                                    <TextBlock Text="{Binding Name.Name}"
+                                                                               FontWeight="SemiBold"
+                                                                               Foreground="{StaticResource CarbonMuted}"
+                                                                               TextTrimming="CharacterEllipsis"
+                                                                               VerticalAlignment="Center" />
+                                                                </DockPanel>
+                                                            </ToggleButton>
+                                                            <ui:Button Grid.Column="1"
+                                                                       Content="×"
+                                                                       Padding="6,0"
+                                                                       Margin="4,0,0,0"
+                                                                       ToolTip="Delete this group"
+                                                                       Tag="{Binding Name}"
+                                                                       Click="DeleteAccountGroup_Click">
+                                                                <ui:Button.Style>
+                                                                    <Style TargetType="{x:Type ui:Button}"
+                                                                           BasedOn="{StaticResource ActionButton}">
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding Name.Id}"
+                                                                                         Value="{x:Null}">
+                                                                                <Setter Property="Visibility"
+                                                                                        Value="Collapsed" />
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </ui:Button.Style>
+                                                            </ui:Button>
+                                                        </Grid>
+                                                        <Border x:Name="GroupContent"
+                                                                Grid.Row="1"
+                                                                ClipToBounds="True">
+                                                            <ItemsPresenter />
+                                                        </Border>
+                                                    </Grid>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </GroupStyle.ContainerStyle>
+                            </GroupStyle>
+                        </ListBox.GroupStyle>
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="{x:Type ListBoxItem}"
+                                   BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                                <Setter Property="Padding" Value="6,2" />
+                                <Setter Property="Margin" Value="0,2" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsGroupPlaceholder}"
+                                                 Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Setter Property="Height" Value="0" />
+                                        <Setter Property="IsHitTestVisible" Value="False" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="5,3,6,3"
+                                        CornerRadius="5,8,8,5"
+                                        ToolTip="{Binding StatusToolTip}">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="{StaticResource CarbonPanel}" />
+                                            <Setter Property="BorderBrush" Value="{StaticResource CarbonBorder}" />
+                                            <Setter Property="BorderThickness" Value="1,1,1,2" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                                             Value="True">
+                                                    <Setter Property="Background" Value="{StaticResource CarbonHoverStrong}" />
+                                                    <Setter Property="BorderBrush" Value="{StaticResource CarbonMuted}" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Status}" Value="Ready">
+                                                    <Setter Property="BorderBrush" Value="{StaticResource MatrixOk}" />
+                                                    <Setter Property="Background" Value="{StaticResource MatrixOkFill}" />
+                                                    <Setter Property="BorderThickness" Value="2" />
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Status}" Value="Error">
+                                                    <Setter Property="BorderBrush" Value="{StaticResource MatrixError}" />
+                                                    <Setter Property="Background" Value="{StaticResource MatrixErrorFill}" />
+                                                    <Setter Property="BorderThickness" Value="2" />
+                                                </DataTrigger>
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding Status}" Value="Ready" />
+                                                        <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                                                   Value="True" />
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter Property="BorderBrush" Value="{StaticResource MatrixOk}" />
+                                                    <Setter Property="Background" Value="{StaticResource CarbonHoverStrong}" />
+                                                    <Setter Property="BorderThickness" Value="2" />
+                                                </MultiDataTrigger>
+                                                <MultiDataTrigger>
+                                                    <MultiDataTrigger.Conditions>
+                                                        <Condition Binding="{Binding Status}" Value="Error" />
+                                                        <Condition Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                                                   Value="True" />
+                                                    </MultiDataTrigger.Conditions>
+                                                    <Setter Property="BorderBrush" Value="{StaticResource MatrixError}" />
+                                                    <Setter Property="Background" Value="{StaticResource CarbonHoverStrong}" />
+                                                    <Setter Property="BorderThickness" Value="2" />
+                                                </MultiDataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                        <DockPanel LastChildFill="True">
+                                            <ui:Button DockPanel.Dock="Left"
+                                                       Style="{StaticResource AccountRowSyncButton}"
+                                                       ToolTip="Sync this account"
+                                                       Tag="{Binding}"
+                                                       Click="AccountSyncButton_Click">
+                                                <ui:SymbolIcon Symbol="ArrowSync24"
+                                                               FontSize="16"
+                                                               Foreground="#FFFFFF" />
+                                            </ui:Button>
+                                            <ui:Button DockPanel.Dock="Left"
+                                                       Style="{StaticResource AccountRowSyncButton}"
+                                                       ToolTip="Copy this email address"
+                                                       Tag="{Binding}"
+                                                       Click="CopyAccountEmailButton_Click">
+                                                <ui:SymbolIcon Symbol="Copy24"
+                                                               FontSize="16"
+                                                               Foreground="#FFFFFF" />
+                                            </ui:Button>
+                                            <ui:Button DockPanel.Dock="Left"
+                                                       Style="{StaticResource AccountRowSyncButton}"
+                                                       ToolTip="{Binding NoteToolTip}"
+                                                       Tag="{Binding}"
+                                                       Click="AccountNoteButton_Click">
+                                                <ui:SymbolIcon Symbol="Note24"
+                                                               FontSize="16">
+                                                    <ui:SymbolIcon.Style>
+                                                        <Style TargetType="ui:SymbolIcon">
+                                                            <Setter Property="Foreground" Value="{StaticResource CarbonSubtle}" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding HasNote}" Value="True">
+                                                                    <Setter Property="Foreground" Value="{StaticResource CarbonGreenBright}" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </ui:SymbolIcon.Style>
+                                                </ui:SymbolIcon>
+                                            </ui:Button>
+                                            <TextBlock DockPanel.Dock="Left"
+                                                       Text="P"
+                                                       FontSize="11"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{StaticResource CarbonMuted}"
+                                                       VerticalAlignment="Center"
+                                                       Margin="0,0,6,0"
+                                                       ToolTip="Priority sync">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding SyncPriority}" Value="0">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                            <ui:SymbolIcon DockPanel.Dock="Right"
+                                                           FontSize="16"
+                                                           Margin="8,0,2,0"
+                                                           VerticalAlignment="Center"
+                                                           IsHitTestVisible="False"
+                                                           ToolTip="Mailbox">
+                                                <ui:SymbolIcon.Style>
+                                                    <Style TargetType="ui:SymbolIcon">
+                                                        <Setter Property="Symbol" Value="Mail24" />
+                                                        <Setter Property="Foreground" Value="{StaticResource CarbonSubtle}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}"
+                                                                         Value="True">
+                                                                <Setter Property="Symbol" Value="MailRead24" />
+                                                                <Setter Property="Foreground" Value="{StaticResource CarbonGreenBright}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </ui:SymbolIcon.Style>
+                                            </ui:SymbolIcon>
+                                            <TextBlock Text="{Binding Email}"
+                                                       VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis" />
+                                        </DockPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                        <ListBox.ContextMenu>
+                            <ContextMenu Style="{StaticResource DarkContextMenu}"
+                                         Opened="AccountsContextMenu_Opened">
+                                <MenuItem Header="Copy email address"
+                                          Style="{StaticResource DarkMenuItem}"
+                                          Click="CopyAccountEmailMenu_Click" />
+                                <Separator />
+                                <MenuItem Header="Sync selected"
+                                          Style="{StaticResource DarkMenuItem}"
+                                          Click="SyncSelectedAccounts_Click" />
+                                <MenuItem Header="Priority sync"
+                                          Tag="PrioritySync"
+                                          Style="{StaticResource DarkMenuItem}"
+                                          Click="PrioritySyncMenu_Click" />
+                                <MenuItem Header="Change proxy..."
+                                          Style="{StaticResource DarkMenuItem}"
+                                          Click="ChangeSelectedProxy_Click" />
+                                <MenuItem Header="Export selected..."
+                                          Style="{StaticResource DarkMenuItem}"
+                                          Click="ExportSelectedAccounts_Click" />
+                                <Separator />
+                                <MenuItem Header="Create group from selected..."
+                                          Style="{StaticResource DarkMenuItem}"
+                                          Click="NewGroupFromContextMenu_Click" />
+                                <MenuItem Header="Add selected to group"
+                                          Tag="MoveGroupRoot"
+                                          Style="{StaticResource DarkMenuItem}" />
+                                <Separator />
+                                <MenuItem Header="Delete account"
+                                          Style="{StaticResource DarkMenuItem}"
+                                          Click="DeleteAccountMenu_Click" />
+                            </ContextMenu>
+                        </ListBox.ContextMenu>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <GridSplitter Grid.Column="1"
+                          Style="{StaticResource ColumnSplitter}"
+                          DragCompleted="MainColumnSplitter_DragCompleted" />
+
+            <Grid Grid.Column="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="230" MinWidth="230" />
+                    <ColumnDefinition Width="*" MinWidth="360" />
+                </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Style="{StaticResource FluentSidebarColumn}">
+                <DockPanel>
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                        <ui:Button x:Name="ShowAllMessagesButton"
+                                   DockPanel.Dock="Right"
+                                   Content="All"
+                                   Style="{StaticResource ActionButton}"
+                                   Padding="10,2"
+                                   ToolTip="Show every message of this account (clears the folder filter)"
+                                   Click="ShowAllMessages_Click" />
+                        <TextBlock Text="FOLDERS"
+                                   Style="{StaticResource SectionTitleText}"
+                                   VerticalAlignment="Center" />
+                    </DockPanel>
+                    <ListBox x:Name="FoldersListBox"
+                             SelectionChanged="FoldersListBox_SelectionChanged">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ToolTip="{Binding CountToolTip}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding DisplayName}"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding ReadSummary}"
+                                               Margin="8,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Foreground="{StaticResource CarbonSubtle}"
+                                               FontSize="11" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <Grid Grid.Column="1" Margin="12,8,16,8">
+                <Border Style="{StaticResource GlassCard}" Margin="0" Padding="12">
+                    <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <DockPanel Grid.Row="0" Margin="0,0,0,12">
+                    <ui:Button x:Name="SettingsButton"
+                               DockPanel.Dock="Right"
+                               Style="{StaticResource SettingsBarButton}"
+                               Margin="8,0,0,0"
+                               ToolTip="Open settings"
+                               Click="OpenSettings_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="Settings24"
+                                           FontSize="16"
+                                           Foreground="#FFFFFF"
+                                           Margin="0,0,8,0" />
+                            <TextBlock Text="Settings"
+                                       Foreground="#FFFFFF"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </ui:Button>
+                    <ui:Button x:Name="AddressBookButton"
+                               DockPanel.Dock="Right"
+                               Style="{StaticResource SettingsBarButton}"
+                               Margin="8,0,0,0"
+                               ToolTip="Open the address book"
+                               Click="OpenAddressBook_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="BookContacts24"
+                                           FontSize="16"
+                                           Foreground="#FFFFFF"
+                                           Margin="0,0,8,0" />
+                            <TextBlock Text="Address book"
+                                       Foreground="#FFFFFF"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </ui:Button>
+
+                    <!-- Icon and hint sit inside the field so it reads as a search box. -->
+                    <Grid Margin="0,0,8,0">
+                        <TextBox x:Name="SearchTextBox"
+                                 Padding="36,8,10,8"
+                                 ToolTip="Search all downloaded mail by sender, subject or text"
+                                 TextChanged="SearchTextBox_TextChanged" />
+                        <ui:SymbolIcon Symbol="Search24"
+                                       FontSize="16"
+                                       Foreground="{StaticResource CarbonMuted}"
+                                       HorizontalAlignment="Left"
+                                       VerticalAlignment="Center"
+                                       Margin="12,0,0,0"
+                                       IsHitTestVisible="False" />
+                        <TextBlock x:Name="SearchPlaceholderTextBlock"
+                                   Text="Search downloaded mail"
+                                   Foreground="{StaticResource CarbonSubtle}"
+                                   FontSize="12"
+                                   HorizontalAlignment="Left"
+                                   VerticalAlignment="Center"
+                                   Margin="38,0,0,0"
+                                   IsHitTestVisible="False" />
+                    </Grid>
+                </DockPanel>
+
+                <Grid Grid.Row="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition x:Name="MessagesPaneRow" Height="3*" MinHeight="60" />
+                        <RowDefinition Height="8" />
+                        <RowDefinition x:Name="PreviewPaneRow" Height="1*" MinHeight="40" />
+                        <RowDefinition Height="8" />
+                        <RowDefinition x:Name="ComposePaneRow" Height="2*" MinHeight="120" />
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0"
+                            Padding="10"
+                            CornerRadius="10"
+                            Background="{StaticResource CarbonSurface}"
+                            BorderBrush="{StaticResource CarbonBorder}"
+                            BorderThickness="1">
+                        <DockPanel LastChildFill="True">
+                            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                                <TextBlock x:Name="MessagesScopeTextBlock"
+                                           DockPanel.Dock="Right"
+                                           Foreground="{StaticResource CarbonSubtle}"
+                                           FontSize="11"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,8,0" />
+                                <TextBlock Text="MESSAGES"
+                                           Style="{StaticResource SectionTitleText}"
+                                           VerticalAlignment="Center" />
+                            </DockPanel>
+                            <ListView x:Name="MessagesListView"
+                                      BorderThickness="0"
+                                      Background="Transparent"
+                                      SelectionMode="Extended"
+                                      VirtualizingPanel.IsVirtualizing="True"
+                                      VirtualizingPanel.VirtualizationMode="Recycling"
+                                      VirtualizingPanel.ScrollUnit="Pixel"
+                                      ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                      ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                                      ScrollViewer.CanContentScroll="False"
+                                      SizeChanged="MessagesListView_SizeChanged"
+                                      MouseDoubleClick="MessagesListView_MouseDoubleClick"
+                                      PreviewMouseRightButtonDown="MessagesListView_PreviewMouseRightButtonDown"
+                                      SelectionChanged="MessagesListView_SelectionChanged"
+                                      GridViewColumnHeader.Click="MessagesColumnHeader_Click">
+                                <ListView.View>
+                                    <GridView>
+                                        <GridViewColumn x:Name="FromColumn" Header="From" Width="300" DisplayMemberBinding="{Binding From}" />
+                                        <GridViewColumn x:Name="SubjectColumn" Header="Subject" Width="300" DisplayMemberBinding="{Binding Subject}" />
+                                        <GridViewColumn x:Name="DateColumn" Header="Date" Width="144">
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding DateUtc, StringFormat='{}{0:yyyy-MM-dd HH:mm}'}"
+                                                               Style="{StaticResource MetaMonoText}"
+                                                               Foreground="{StaticResource CarbonText}" />
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+                                        <GridViewColumn x:Name="AttachmentColumn" Width="38">
+                                            <GridViewColumn.Header>
+                                                <local:PaperclipIcon Width="12"
+                                                                     Height="12"
+                                                                     VerticalAlignment="Center"
+                                                                     HorizontalAlignment="Center"
+                                                                     ToolTip="Attachments" />
+                                            </GridViewColumn.Header>
+                                            <GridViewColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <local:PaperclipIcon Width="12"
+                                                                         Height="12"
+                                                                         HorizontalAlignment="Center"
+                                                                         VerticalAlignment="Center">
+                                                        <local:PaperclipIcon.Style>
+                                                            <Style TargetType="local:PaperclipIcon">
+                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding HasAttachments}"
+                                                                                 Value="True">
+                                                                        <Setter Property="Visibility" Value="Visible" />
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </local:PaperclipIcon.Style>
+                                                    </local:PaperclipIcon>
+                                                </DataTemplate>
+                                            </GridViewColumn.CellTemplate>
+                                        </GridViewColumn>
+                                    </GridView>
+                                </ListView.View>
+                                <ListView.ContextMenu>
+                                    <ContextMenu Style="{StaticResource DarkContextMenu}"
+                                                 Opened="MessagesContextMenu_Opened">
+                                        <MenuItem Header="Open"
+                                                  InputGestureText="Enter"
+                                                  Style="{StaticResource DarkMenuItem}"
+                                                  Click="OpenMessage_Click" />
+                                        <MenuItem Header="Reply"
+                                                  InputGestureText="R"
+                                                  Style="{StaticResource DarkMenuItem}"
+                                                  Click="Reply_Click" />
+                                        <MenuItem Header="Copy sender"
+                                                  InputGestureText="Ctrl+C"
+                                                  Style="{StaticResource DarkMenuItem}"
+                                                  Click="CopySender_Click" />
+                                        <Separator />
+                                        <MenuItem Header="View source"
+                                                  Style="{StaticResource DarkMenuItem}"
+                                                  Click="ViewSource_Click" />
+                                        <MenuItem x:Name="DownloadAttachmentsMenuItem"
+                                                  Header="Download attachments"
+                                                  Style="{StaticResource DarkMenuItem}"
+                                                  Click="DownloadAttachments_Click" />
+                                    </ContextMenu>
+                                </ListView.ContextMenu>
+                            </ListView>
+                        </DockPanel>
+                    </Border>
+
+                    <GridSplitter Grid.Row="1"
+                                  Style="{StaticResource RowSplitter}"
+                                  DragCompleted="PaneSplitter_DragCompleted" />
+
+                    <Border Grid.Row="2"
+                            Padding="10"
+                            CornerRadius="10"
+                            Background="{StaticResource CarbonSurface}"
+                            BorderBrush="{StaticResource CarbonBorder}"
+                            BorderThickness="1">
+                        <DockPanel LastChildFill="True">
+                            <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock x:Name="PreviewSubjectTextBlock"
+                                               Foreground="{StaticResource CarbonText}"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis"
+                                               Text="Select a message" />
+                                    <TextBlock x:Name="PreviewMetaTextBlock"
+                                               Style="{StaticResource MetaMonoText}"
+                                               Margin="0,2,0,0"
+                                               TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center"
+                                            Margin="8,0,0,0">
+                                    <ui:Button x:Name="CopyCodeButton"
+                                               Style="{StaticResource PrimaryActionButton}"
+                                               Padding="12,4"
+                                               Margin="0,0,6,0"
+                                               Visibility="Collapsed"
+                                               ToolTip="Copy this code to the clipboard"
+                                               Click="CopyCode_Click" />
+                                    <ui:Button x:Name="CopySenderButton"
+                                               Style="{StaticResource IconToolButton}"
+                                               IsEnabled="False"
+                                               ToolTip="Copy sender address"
+                                               Click="CopySender_Click">
+                                        <ui:SymbolIcon Symbol="Copy24"
+                                                       FontSize="16"
+                                                       Foreground="#FFFFFF" />
+                                    </ui:Button>
+                                    <ui:Button x:Name="ReplyButton"
+                                               Style="{StaticResource IconToolButton}"
+                                               Margin="6,0,0,0"
+                                               IsEnabled="False"
+                                               ToolTip="Reply to the sender from the selected account"
+                                               Click="Reply_Click">
+                                        <ui:SymbolIcon Symbol="ArrowReply24"
+                                                       FontSize="16"
+                                                       Foreground="#FFFFFF" />
+                                    </ui:Button>
+                                    <ui:Button x:Name="DownloadAttachmentsButton"
+                                               Style="{StaticResource IconToolButton}"
+                                               Margin="6,0,0,0"
+                                               Visibility="Collapsed"
+                                               ToolTip="Download attachments without opening them"
+                                               Click="DownloadAttachments_Click">
+                                        <local:PaperclipIcon Width="15"
+                                                             Height="15"
+                                                             Foreground="#FFFFFF"
+                                                             VerticalAlignment="Center" />
+                                    </ui:Button>
+                                    <ui:Button x:Name="OpenMessageButton"
+                                               Style="{StaticResource IconToolButton}"
+                                               IsEnabled="False"
+                                               ToolTip="Open this message in a separate window (Enter)"
+                                               Click="OpenMessage_Click">
+                                        <ui:SymbolIcon Symbol="Open24"
+                                                       FontSize="16"
+                                                       Foreground="#FFFFFF" />
+                                    </ui:Button>
+                                </StackPanel>
+                            </Grid>
+                            <Grid>
+                                <wv2:WebView2 x:Name="PreviewWebView" Visibility="Collapsed" />
+                                <ScrollViewer x:Name="PreviewTextHost"
+                                              VerticalScrollBarVisibility="Auto"
+                                              HorizontalScrollBarVisibility="Disabled">
+                                    <TextBlock x:Name="PreviewBodyTextBlock"
+                                               TextWrapping="Wrap"
+                                               Foreground="{StaticResource CarbonText}"
+                                               FontSize="13"
+                                               LineHeight="20" />
+                                </ScrollViewer>
+                                <Border x:Name="PreviewLoadingOverlay"
+                                        Background="#CC1A1A1A"
+                                        Visibility="Collapsed">
+                                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Grid Width="72" Height="72">
+                                            <Ellipse Width="64"
+                                                     Height="64"
+                                                     Stroke="#6A6A6A"
+                                                     StrokeThickness="3" />
+                                            <Ellipse x:Name="PreviewLoadArc"
+                                                     Width="64"
+                                                     Height="64"
+                                                     Stroke="#D4D4D4"
+                                                     StrokeThickness="3"
+                                                     StrokeDashCap="Round"
+                                                     RenderTransformOrigin="0.5,0.5">
+                                                <Ellipse.RenderTransform>
+                                                    <RotateTransform Angle="-90" />
+                                                </Ellipse.RenderTransform>
+                                            </Ellipse>
+                                            <TextBlock x:Name="PreviewLoadPercentText"
+                                                       Text="0%"
+                                                       Foreground="#D4D4D4"
+                                                       FontSize="14"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center" />
+                                        </Grid>
+                                        <TextBlock x:Name="PreviewNoticeText"
+                                                   Margin="0,12,0,0"
+                                                   MaxWidth="360"
+                                                   TextWrapping="Wrap"
+                                                   TextAlignment="Center"
+                                                   Foreground="#D4D4D4"
+                                                   FontSize="12"
+                                                   Visibility="Collapsed" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </DockPanel>
+                    </Border>
+
+                    <GridSplitter x:Name="PreviewComposeSplitter"
+                                  Grid.Row="3"
+                                  Style="{StaticResource RowSplitter}"
+                                  DragCompleted="PaneSplitter_DragCompleted" />
+
+                    <Border x:Name="ComposePanel"
+                            Grid.Row="4"
+                            Padding="10,8"
+                            CornerRadius="10"
+                            Background="{StaticResource CarbonSurface}"
+                            BorderBrush="{StaticResource CarbonBorder}"
+                            BorderThickness="1"
+                            Visibility="Collapsed"
+                            IsEnabled="False">
+    <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" MinHeight="44" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <DockPanel Grid.Row="0" Margin="0,0,0,4">
+                                    <ui:Button x:Name="CopyComposeFromButton"
+                                               DockPanel.Dock="Right"
+                                               Style="{StaticResource IconToolButton}"
+                                               ToolTip="Copy this email address"
+                                               Click="CopyComposeFrom_Click">
+                                        <ui:SymbolIcon Symbol="Copy24"
+                                                       FontSize="14"
+                                                       Foreground="#FFFFFF" />
+                                    </ui:Button>
+                                    <TextBlock x:Name="ComposeFromTextBlock"
+                                               Foreground="{StaticResource CarbonMuted}"
+                                               FontSize="12"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"
+                                               Text="Select an account to send mail." />
+                                </DockPanel>
+                                <Grid Grid.Row="1" Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="ComposeToTextBox"
+                                             Grid.Column="0"
+                                             Style="{StaticResource ComposeLineTextBox}"
+                                             ToolTip="One or more recipients separated by commas or semicolons, e.g. a@x.com, Name &lt;b@y.com&gt;" />
+                                    <TextBlock Grid.Column="0"
+                                               Text="To"
+                                               Margin="13,0,0,0"
+                                               VerticalAlignment="Center"
+                                               IsHitTestVisible="False"
+                                               Foreground="{StaticResource CarbonSubtle}"
+                                               FontSize="12">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding Text.Length, ElementName=ComposeToTextBox}" Value="0" />
+                                                            <Condition Binding="{Binding IsKeyboardFocused, ElementName=ComposeToTextBox}" Value="False" />
+                                                        </MultiDataTrigger.Conditions>
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </MultiDataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBox x:Name="ComposeSubjectTextBox"
+                                             Grid.Column="2"
+                                             Style="{StaticResource ComposeLineTextBox}"
+                                             ToolTip="Message subject" />
+                                    <TextBlock Grid.Column="2"
+                                               Text="Subject"
+                                               Margin="13,0,0,0"
+                                               VerticalAlignment="Center"
+                                               IsHitTestVisible="False"
+                                               Foreground="{StaticResource CarbonSubtle}"
+                                               FontSize="12">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                <Style.Triggers>
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding Text.Length, ElementName=ComposeSubjectTextBox}" Value="0" />
+                                                            <Condition Binding="{Binding IsKeyboardFocused, ElementName=ComposeSubjectTextBox}" Value="False" />
+                                                        </MultiDataTrigger.Conditions>
+                                                        <Setter Property="Visibility" Value="Visible" />
+                                                    </MultiDataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+                                <TextBox x:Name="ComposeBodyTextBox"
+                                         Grid.Row="2"
+                                         MinHeight="44"
+                                         Padding="12,8"
+                                         AcceptsReturn="True"
+                                         TextWrapping="Wrap"
+                                         VerticalScrollBarVisibility="Auto"
+                                         ToolTip="Message body"
+                                         Margin="0,0,0,6" />
+                                <DockPanel Grid.Row="3" LastChildFill="True">
+                                    <ui:Button x:Name="SendMailButton"
+                                               DockPanel.Dock="Left"
+                                               VerticalAlignment="Top"
+                                               Content="Send"
+                                               Style="{StaticResource PrimaryActionButton}"
+                                               Padding="16,5"
+                                               Click="SendMail_Click" />
+                                    <local:AttachmentPicker x:Name="ComposeAttachments"
+                                                            DockPanel.Dock="Left"
+                                                            Margin="6,0,0,0"
+                                                            MaxWidth="360" />
+                                    <TextBlock x:Name="ComposeStatusTextBlock"
+                                               Margin="10,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Foreground="{StaticResource CarbonMuted}"
+                                               FontSize="12"
+                                               TextTrimming="CharacterEllipsis"
+                                               TextWrapping="NoWrap" />
+                                </DockPanel>
+                            </Grid>
+                    </Border>
+                </Grid>
+                    </Grid>
+                </Border>
+            </Grid>
+            </Grid>
+        </Grid>
+
+        <Border Grid.Row="2"
+                Style="{StaticResource FluentStatusBar}"
+                Height="32"
+                Padding="16,0"
+                SnapsToDevicePixels="True"
+                UseLayoutRounding="True">
+            <Grid Height="16" VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="200" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock x:Name="AccountsTotalTextBlock"
+                           Style="{StaticResource StatusBarLabel}"
+                           Foreground="{StaticResource CarbonText}"
+                           Text="Accounts: 0" />
+                <TextBlock Grid.Column="1"
+                           Style="{StaticResource StatusBarLabel}"
+                           Text="·"
+                           Margin="8,0"
+                           Foreground="{StaticResource CarbonSubtle}" />
+                <TextBlock x:Name="StatusTextBlock"
+                           Grid.Column="2"
+                           Style="{StaticResource StatusBarLabel}"
+                           Margin="0,0,16,0"
+                           Foreground="{StaticResource CarbonMuted}"
+                           TextTrimming="CharacterEllipsis"
+                           TextWrapping="NoWrap"
+                           ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+
+                <TextBlock x:Name="SyncCountTextBlock"
+                           Grid.Column="3"
+                           Style="{StaticResource StatusBarLabel}"
+                           Margin="0,0,16,0"
+                           Foreground="{StaticResource MatrixOk}"
+                           Text="0 / 0 synced" />
+
+                <Border x:Name="ProgressBarHost"
+                        Grid.Column="4"
+                        Style="{StaticResource SyncProgressHost}"
+                        Margin="0"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Center">
+                    <ProgressBar x:Name="ProgressBar"
+                                 Style="{StaticResource SyncProgressBar}" />
+                </Border>
+            </Grid>
+        </Border>
+    </Grid>
+</ui:FluentWindow>

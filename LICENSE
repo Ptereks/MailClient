@@ -1,0 +1,35 @@
+Source-Available License for Audit
+
+Copyright (c) 2026 Ptereks. All rights reserved.
+
+This source code is published so that users of the program can verify what it does.
+
+Permitted:
+
+1. Viewing, cloning and studying the source code.
+2. Building the program from this source for the purpose of verifying that a
+   released binary corresponds to the published source.
+3. Running a build you made yourself for your own evaluation.
+
+Not permitted without prior written permission from the copyright holder:
+
+1. Redistributing the source code or any binary built from it, in whole or in
+   part, modified or unmodified.
+2. Using the source code, or any part of it, in another program or product.
+3. Selling, sublicensing, renting or otherwise commercially exploiting the
+   source code or builds made from it.
+4. Removing or altering this notice.
+
+Released binaries are provided to customers under the terms agreed with the
+copyright holder and are not covered by this license.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OF THE SOFTWARE.
+
+Third-party components keep their own licenses: MailKit and MimeKit (MIT),
+LiteDB (MIT), Markdig (BSD-2-Clause), WPF-UI (MIT), Microsoft.Web.WebView2
+(Microsoft Software License Terms), JetBrains Mono (SIL Open Font License 1.1,
+see data/runtime/JetBrainsMono-OFL.txt).

@@ -1,0 +1,137 @@
+<ui:FluentWindow x:Class="ZennoVibe.MailClient.MessageViewWindow"
+        x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:local="clr-namespace:ZennoVibe.MailClient"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="Message"
+        Width="920"
+        Height="720"
+        MinWidth="640"
+        MinHeight="480"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip"
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="None"
+        Icon="/Assets/AppIcon.ico"
+        Background="{StaticResource CarbonGlassCard}">
+
+    <Grid Background="Transparent">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar x:Name="MessageTitleBar"
+                     Grid.Row="0"
+                     ShowMaximize="False"
+                     ShowMinimize="False"
+                     ShowClose="False">
+            <ui:TitleBar.TrailingContent>
+                <local:CaptionButtons ShowMaximize="True" />
+            </ui:TitleBar.TrailingContent>
+        </ui:TitleBar>
+
+        <Border Grid.Row="1"
+                Margin="16,12,16,8"
+                Padding="12,10"
+                CornerRadius="10"
+                Background="{StaticResource CarbonSurface}"
+                BorderBrush="{StaticResource CarbonBorder}"
+                BorderThickness="1">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                    <TextBlock x:Name="SubjectTextBlock"
+                               FontSize="16"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource CarbonText}"
+                               TextWrapping="Wrap" />
+                    <TextBlock x:Name="MetaTextBlock"
+                               Foreground="{StaticResource CarbonMuted}"
+                               FontSize="12"
+                               Margin="0,6,0,0"
+                               TextWrapping="Wrap" />
+                    <StackPanel x:Name="AttachmentSummaryPanel"
+                                Orientation="Horizontal"
+                                Margin="0,6,0,0"
+                                Visibility="Collapsed">
+                        <local:PaperclipIcon Width="12"
+                                             Height="12"
+                                             VerticalAlignment="Center"
+                                             Margin="0,1,6,0" />
+                        <TextBlock x:Name="AttachmentSummaryTextBlock"
+                                   Foreground="{StaticResource CarbonMuted}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </StackPanel>
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Top"
+                            Margin="12,0,0,0">
+                    <ui:Button x:Name="DownloadAttachmentsButton"
+                               Style="{StaticResource IconToolButton}"
+                               Margin="0,0,6,0"
+                               Visibility="Collapsed"
+                               ToolTip="Download attachments without opening them"
+                               Click="DownloadAttachments_Click">
+                        <local:PaperclipIcon Width="15"
+                                             Height="15"
+                                             Foreground="#FFFFFF"
+                                             VerticalAlignment="Center" />
+                    </ui:Button>
+                    <ui:Button x:Name="CopyCodeButton"
+                               Style="{StaticResource PrimaryActionButton}"
+                               Padding="12,4"
+                               Margin="0,0,6,0"
+                               Visibility="Collapsed"
+                               ToolTip="Copy this code to the clipboard"
+                               Click="CopyCode_Click" />
+                    <ui:Button Style="{StaticResource IconToolButton}"
+                               Margin="0,0,6,0"
+                               ToolTip="Copy sender address"
+                               Click="CopyFrom_Click">
+                        <ui:SymbolIcon Symbol="Copy24"
+                                       FontSize="16"
+                                       Foreground="#FFFFFF" />
+                    </ui:Button>
+                    <ui:Button Style="{StaticResource IconToolButton}"
+                               ToolTip="Copy recipient address"
+                               Click="CopyTo_Click">
+                        <ui:SymbolIcon Symbol="Mail24"
+                                       FontSize="16"
+                                       Foreground="#FFFFFF" />
+                    </ui:Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="2"
+                Margin="16,0,16,16"
+                CornerRadius="10"
+                Background="#FFFFFFFF"
+                BorderBrush="{StaticResource CarbonBorder}"
+                BorderThickness="1">
+            <Grid>
+                <wv2:WebView2 x:Name="MessageWebView" />
+                <ScrollViewer x:Name="PlainTextFallback"
+                              Visibility="Collapsed"
+                              VerticalScrollBarVisibility="Auto"
+                              Padding="16,12">
+                    <TextBlock x:Name="PlainTextFallbackBlock"
+                               TextWrapping="Wrap"
+                               Foreground="#FF1A1A1A"
+                               FontFamily="Consolas, Segoe UI, monospace"
+                               FontSize="13"
+                               LineHeight="20" />
+                </ScrollViewer>
+            </Grid>
+        </Border>
+    </Grid>
+</ui:FluentWindow>

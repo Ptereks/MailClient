@@ -1,0 +1,80 @@
+<UserControl x:Class="ZennoVibe.MailClient.CaptionButtons"
+             x:ClassModifier="internal"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Height="32"
+             VerticalAlignment="Top"
+             Focusable="False">
+    <UserControl.Resources>
+        <!-- Plain client-area buttons. WPF-UI's own caption buttons are driven by WM_NCHITTEST /
+             WM_NCLBUTTONUP interception, which misses clicks on Windows 10; these do not. -->
+        <Style x:Key="CaptionButtonBase" TargetType="Button">
+            <Setter Property="Width" Value="46" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{StaticResource CarbonText}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#33FFFFFF" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#22FFFFFF" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="CaptionCloseButton" TargetType="Button" BasedOn="{StaticResource CaptionButtonBase}">
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#C42B1C" />
+                    <Setter Property="Foreground" Value="White" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#B3271A" />
+                    <Setter Property="Foreground" Value="White" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="CaptionGlyph" TargetType="Path">
+            <Setter Property="Width" Value="10" />
+            <Setter Property="Height" Value="10" />
+            <Setter Property="Stretch" Value="None" />
+            <Setter Property="StrokeThickness" Value="1" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="Stroke" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+        </Style>
+    </UserControl.Resources>
+
+    <StackPanel Orientation="Horizontal">
+        <Button x:Name="MaximizeButton"
+                Style="{StaticResource CaptionButtonBase}"
+                Visibility="Collapsed"
+                ToolTip="Maximize"
+                Click="Maximize_Click">
+            <Path x:Name="MaximizeGlyph"
+                  Style="{StaticResource CaptionGlyph}"
+                  Data="M0.5,0.5 H9.5 V9.5 H0.5 Z" />
+        </Button>
+        <Button x:Name="CloseButton"
+                Style="{StaticResource CaptionCloseButton}"
+                ToolTip="Close"
+                Click="Close_Click">
+            <Path Style="{StaticResource CaptionGlyph}"
+                  Data="M0,0 L10,10 M10,0 L0,10" />
+        </Button>
+    </StackPanel>
+</UserControl>

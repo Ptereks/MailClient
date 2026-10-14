@@ -1,0 +1,45 @@
+<ui:FluentWindow x:Class="ZennoVibe.MailClient.DocumentationWindow"
+        x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        xmlns:local="clr-namespace:ZennoVibe.MailClient"
+        Title="Documentation"
+        Width="960"
+        Height="760"
+        MinWidth="720"
+        MinHeight="520"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip"
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="None"
+        Icon="/Assets/AppIcon.ico"
+        Background="{StaticResource CarbonBackground}">
+
+    <Grid Background="{StaticResource CarbonBackground}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0"
+                     Title="Documentation"
+                     ShowMaximize="False"
+                     ShowMinimize="False"
+                     ShowClose="False">
+            <ui:TitleBar.TrailingContent>
+                <local:CaptionButtons ShowMaximize="True" />
+            </ui:TitleBar.TrailingContent>
+        </ui:TitleBar>
+
+        <Border Grid.Row="1"
+                Margin="16,12,16,16"
+                CornerRadius="10"
+                Background="#FFFFFFFF"
+                BorderBrush="{StaticResource CarbonBorder}"
+                BorderThickness="1">
+            <wv2:WebView2 x:Name="DocumentationWebView" />
+        </Border>
+    </Grid>
+</ui:FluentWindow>

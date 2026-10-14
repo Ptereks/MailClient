@@ -1,0 +1,95 @@
+<UserControl x:Class="ZennoVibe.MailClient.AttachmentPicker"
+             x:ClassModifier="internal"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             Focusable="False">
+    <UserControl.Resources>
+        <Style x:Key="ChipRemoveButton" TargetType="Button">
+            <Setter Property="Width" Value="18" />
+            <Setter Property="Height" Value="18" />
+            <Setter Property="Margin" Value="4,0,0,0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Foreground" Value="{StaticResource CarbonMuted}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="ToolTip" Value="Remove this file" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bg" Background="{TemplateBinding Background}" CornerRadius="9">
+                            <TextBlock Text="✕"
+                                       FontSize="10"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       Foreground="{TemplateBinding Foreground}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bg" Property="Background" Value="#33FFFFFF" />
+                                <Setter Property="Foreground" Value="{StaticResource CarbonText}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <DockPanel LastChildFill="True">
+        <ui:Button x:Name="AttachButton"
+                   DockPanel.Dock="Left"
+                   VerticalAlignment="Top"
+                   Style="{StaticResource IconToolButton}"
+                   ToolTip="Attach files (25 MB per message in total)"
+                   Click="Attach_Click">
+            <ui:SymbolIcon Symbol="Attach24"
+                           FontSize="15"
+                           Foreground="#FFFFFF" />
+        </ui:Button>
+        <StackPanel Orientation="Vertical" VerticalAlignment="Center" Margin="4,0,0,0">
+            <ItemsControl x:Name="ChipsHost">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Margin="0,2,6,2"
+                                Padding="8,3,4,3"
+                                CornerRadius="7"
+                                Background="{StaticResource CarbonPanel}"
+                                BorderBrush="{StaticResource CarbonBorder}"
+                                BorderThickness="1"
+                                ToolTip="{Binding Path}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding Name}"
+                                           Foreground="{StaticResource CarbonText}"
+                                           FontSize="12"
+                                           MaxWidth="180"
+                                           TextTrimming="CharacterEllipsis"
+                                           VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding Size}"
+                                           Margin="6,0,0,0"
+                                           Foreground="{StaticResource CarbonMuted}"
+                                           FontSize="11"
+                                           VerticalAlignment="Center" />
+                                <Button Style="{StaticResource ChipRemoveButton}"
+                                        Tag="{Binding Path}"
+                                        Click="Remove_Click" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock x:Name="SummaryTextBlock"
+                       Foreground="{StaticResource CarbonMuted}"
+                       FontSize="11"
+                       Margin="0,0,0,2"
+                       Visibility="Collapsed" />
+        </StackPanel>
+    </DockPanel>
+</UserControl>

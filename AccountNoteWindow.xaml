@@ -1,0 +1,164 @@
+<ui:FluentWindow x:Class="ZennoVibe.MailClient.AccountNoteWindow"
+        x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:local="clr-namespace:ZennoVibe.MailClient"
+        Title="Profile"
+        Width="520"
+        Height="460"
+        MinWidth="420"
+        MinHeight="420"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="None"
+        Icon="/Assets/AppIcon.ico"
+        Background="{StaticResource CarbonBackground}">
+
+    <Grid Background="{StaticResource CarbonBackground}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar x:Name="NoteTitleBar"
+                     Grid.Row="0"
+                     Height="36"
+                     Title="Profile"
+                     ShowHelp="False"
+                     ShowMaximize="False"
+                     ShowMinimize="False"
+                     ShowClose="False">
+            <ui:TitleBar.TrailingContent>
+                <local:CaptionButtons />
+            </ui:TitleBar.TrailingContent>
+        </ui:TitleBar>
+
+        <StackPanel Grid.Row="1"
+                    Orientation="Horizontal"
+                    Margin="16,4,16,8">
+            <TextBlock x:Name="EmailTextBlock"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis"
+                       Foreground="{StaticResource CarbonText}" />
+            <ui:Button Style="{StaticResource AccountRowSyncButton}"
+                       Margin="4,0,0,0"
+                       ToolTip="Copy address"
+                       Click="Copy_Click">
+                <ui:SymbolIcon Symbol="Copy24"
+                               FontSize="14"
+                               Foreground="#FFFFFF" />
+            </ui:Button>
+        </StackPanel>
+
+        <Grid Grid.Row="2" Margin="16,0,16,8">
+            <TextBox x:Name="NoteTextBox"
+                     AcceptsReturn="True"
+                     TextWrapping="Wrap"
+                     MaxLength="400"
+                     Padding="12,10"
+                     VerticalContentAlignment="Top"
+                     ScrollViewer.CanContentScroll="False"
+                     VerticalScrollBarVisibility="Auto"
+                     TextChanged="NoteTextBox_TextChanged"
+                     GotKeyboardFocus="NoteTextBox_FocusChanged"
+                     LostKeyboardFocus="NoteTextBox_FocusChanged">
+                <TextBox.Template>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="NoteBorder"
+                                Background="{StaticResource CarbonSurface}"
+                                BorderBrush="{StaticResource CarbonBorder}"
+                                BorderThickness="1"
+                                CornerRadius="8">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                          Focusable="False"
+                                          HorizontalScrollBarVisibility="Hidden"
+                                          VerticalScrollBarVisibility="Auto" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="NoteBorder" Property="BorderBrush" Value="{StaticResource CarbonGreenBright}" />
+                                <Setter TargetName="NoteBorder" Property="Background" Value="{StaticResource CarbonPanel}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </TextBox.Template>
+            </TextBox>
+            <TextBlock x:Name="NotePlaceholder"
+                       Text="Note"
+                       Margin="13,11,0,0"
+                       Padding="0"
+                       HorizontalAlignment="Left"
+                       VerticalAlignment="Top"
+                       IsHitTestVisible="False"
+                       Foreground="{StaticResource CarbonSubtle}" />
+        </Grid>
+
+        <TextBlock Grid.Row="3"
+                   Margin="16,4,16,4"
+                   Foreground="{StaticResource CarbonMuted}"
+                   FontSize="12"
+                   Text="Proxy used for this account" />
+
+        <ComboBox x:Name="ProxyComboBox"
+                  Grid.Row="4"
+                  Margin="16,0,16,8" />
+
+        <DockPanel Grid.Row="5" Margin="16,0,16,16">
+            <ui:Button DockPanel.Dock="Right"
+                       Style="{StaticResource AccountRowSyncButton}"
+                       Margin="8,0,0,0"
+                       ToolTip="Save"
+                       Click="Save_Click">
+                <ui:SymbolIcon Symbol="Save24"
+                               FontSize="16"
+                               Foreground="#FFFFFF" />
+            </ui:Button>
+            <Grid>
+                <TextBox x:Name="NewProxyTextBox"
+                         Height="36"
+                         MinHeight="36"
+                         MaxHeight="36"
+                         Padding="12,0"
+                         VerticalContentAlignment="Center"
+                         ScrollViewer.CanContentScroll="False"
+                         TextChanged="NewProxyTextBox_TextChanged"
+                         GotKeyboardFocus="NewProxyTextBox_FocusChanged"
+                         LostKeyboardFocus="NewProxyTextBox_FocusChanged">
+                    <TextBox.Template>
+                        <ControlTemplate TargetType="TextBox">
+                            <Border x:Name="ProxyBorder"
+                                    Background="{StaticResource CarbonSurface}"
+                                    BorderBrush="{StaticResource CarbonBorder}"
+                                    BorderThickness="1"
+                                    CornerRadius="8">
+                                <ScrollViewer x:Name="PART_ContentHost"
+                                              Focusable="False"
+                                              HorizontalScrollBarVisibility="Hidden"
+                                              VerticalScrollBarVisibility="Disabled" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter TargetName="ProxyBorder" Property="BorderBrush" Value="{StaticResource CarbonGreenBright}" />
+                                    <Setter TargetName="ProxyBorder" Property="Background" Value="{StaticResource CarbonPanel}" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </TextBox.Template>
+                </TextBox>
+                <TextBlock x:Name="ProxyPlaceholder"
+                           Text="New proxy"
+                           Margin="13,0,0,0"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Left"
+                           IsHitTestVisible="False"
+                           Foreground="{StaticResource CarbonSubtle}" />
+            </Grid>
+        </DockPanel>
+    </Grid>
+</ui:FluentWindow>

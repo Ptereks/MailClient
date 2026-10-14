@@ -1,0 +1,22 @@
+# proxy.txt — one proxy per line. Paste your list as-is; the app detects the format.
+#
+# Proxy type (optional prefix; without it the line is treated as HTTP):
+#   http, https       HTTP proxy
+#   socks5, socks5h   SOCKS5
+#   socks4, socks4a   SOCKS4 / SOCKS4A
+#
+# Layout (separator can be : ; | , space or tab):
+#   host:port
+#   host:port:user:pass
+#   user:pass:host:port
+#   user:pass@host:port
+#   host:port@user:pass
+#   socks5://user:pass@host:port
+#
+# Examples:
+#   192.168.1.10:8080
+#   proxy.example.com:1080:myuser:mypassword
+#   myuser:mypassword@proxy.example.com:1080
+#   socks5://myuser:mypassword@proxy.example.com:1080
+#
+# Lines starting with # are ignored. Unreadable lines are skipped.

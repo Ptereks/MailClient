@@ -1,0 +1,293 @@
+<ui:FluentWindow x:Class="ZennoVibe.MailClient.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:local="clr-namespace:ZennoVibe.MailClient"
+        Title="Settings"
+        Width="1120"
+        Height="870"
+        MinWidth="1000"
+        MinHeight="830"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip"
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="None"
+        Icon="/Assets/AppIcon.ico"
+        Background="{StaticResource CarbonGlassCard}">
+
+    <Grid Background="Transparent">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar x:Name="SettingsTitleBar"
+                     Grid.Row="0"
+                     Title="Settings"
+                     ShowMaximize="False"
+                     ShowMinimize="False"
+                     ShowClose="False">
+            <ui:TitleBar.Icon>
+                <ui:ImageIcon Source="pack://application:,,,/Assets/AppIcon.ico"
+                              Width="16"
+                              Height="16" />
+            </ui:TitleBar.Icon>
+            <ui:TitleBar.TrailingContent>
+                <local:CaptionButtons />
+            </ui:TitleBar.TrailingContent>
+        </ui:TitleBar>
+
+        <!-- No scroll viewer: the window is sized so every setting is visible at once. -->
+        <Grid Grid.Row="1" Margin="20,14,20,10">
+            <StackPanel>
+                <Border Style="{StaticResource GlassCard}" Padding="14" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="ACTIONS" Style="{StaticResource SectionTitleText}" />
+                        <WrapPanel Orientation="Horizontal">
+                                <ui:Button x:Name="ImportButton" Content="Import accounts" Style="{StaticResource ActionButton}" Margin="0,0,8,0" Click="Import_Click" />
+                                <ui:Button x:Name="SyncButton" Content="Sync all (IMAP)" Style="{StaticResource ActionButton}" Margin="0,0,8,0" Click="Sync_Click" />
+                                <ui:Button x:Name="CancelButton" Content="Cancel sync" Style="{StaticResource ActionButton}" Margin="0,0,8,0" IsEnabled="False" Click="Cancel_Click" />
+                                <ui:Button x:Name="AboutButton" Content="About" Style="{StaticResource ActionButton}" Margin="0,0,8,0" Click="About_Click" />
+                                <ui:Button x:Name="DocumentationButton" Content="Documentation" Style="{StaticResource ActionButton}" Margin="0,0,8,0" Click="Documentation_Click" />
+                                <ui:Button x:Name="ExportDatabaseButton"
+                                           Content="Export database"
+                                           Style="{StaticResource ActionButton}"
+                                           Margin="0,0,8,0"
+                                           ToolTip="Save an unencrypted copy of the whole database (accounts, tokens, mail) to a file of your choice. The working database in data\DB stays encrypted with a key bound to this Windows user."
+                                           Click="ExportDatabase_Click" />
+                                <TextBlock Text="Threads"
+                                           Foreground="{StaticResource CarbonMuted}"
+                                           FontSize="12"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,8,0" />
+                                <TextBox x:Name="ThreadsTextBox"
+                                         Width="48"
+                                         Height="30"
+                                         Padding="6,2"
+                                         VerticalAlignment="Center"
+                                         Text="50"
+                                         ToolTip="Parallel sync threads" />
+                        </WrapPanel>
+                        <WrapPanel Orientation="Horizontal" Margin="0,16,0,0">
+                                <TextBlock Text="Messages"
+                                           Foreground="{StaticResource CarbonMuted}"
+                                           FontSize="12"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,8,0" />
+                                <TextBox x:Name="MessageLimitTextBox"
+                                         Width="52"
+                                         Height="30"
+                                         Padding="6,2"
+                                         VerticalAlignment="Center"
+                                         Text="200"
+                                         ToolTip="How many recent messages are loaded from one account initially, all folders together — not per folder. 200 means the 200 newest existing messages. Already loaded mail is never removed; later syncs append every newly arrived message. Allowed: 10-2000." />
+                                <CheckBox x:Name="ComposeCheckBox"
+                                          Content="Compose"
+                                          Foreground="{StaticResource CarbonText}"
+                                          VerticalAlignment="Center"
+                                          Margin="16,0,0,0"
+                                          ToolTip="Show the compose (SMTP) section in the main window" />
+                                <CheckBox x:Name="LoadMediaCheckBox"
+                                          Content="Load media"
+                                          Foreground="{StaticResource CarbonText}"
+                                          VerticalAlignment="Center"
+                                          Margin="16,0,0,0"
+                                          ToolTip="Download remote images, fonts, video and stylesheets in the message window. Every request goes through your proxy — the real IP is never used. Tracking pixels in mail will also fire. Off by default." />
+                        </WrapPanel>
+                        <TextBlock Foreground="{StaticResource CarbonSubtle}"
+                                   FontSize="11"
+                                   Margin="0,6,0,0"
+                                   TextWrapping="Wrap"
+                                   Text="Messages: how many of the newest existing messages are loaded initially per account, all folders together (10-2000). Loaded mail stays; later syncs append new mail. Accounts are spread evenly across the proxy lines, and message text is downloaded when you open a message. Load media: remote images, fonts, video and stylesheets are fetched through the proxy when a message is opened; tracking pixels fire too. Off keeps the real IP hidden." />
+                        <TextBlock x:Name="ActionStatusTextBlock"
+                                   Foreground="{StaticResource CarbonMuted}"
+                                   FontSize="12"
+                                   Margin="0,4,0,0"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <Border Style="{StaticResource GlassCard}" Padding="14" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="FILES" Style="{StaticResource SectionTitleText}" />
+
+                        <!-- Both paths sit on one line: the window is wide, vertical space is not. -->
+                        <Grid Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="16" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Account file" Foreground="{StaticResource CarbonMuted}" FontSize="12" Margin="0,0,0,4" />
+                            <TextBox x:Name="AccountFileTextBox" Grid.Row="1" Grid.Column="0" Margin="0,0,8,0" />
+                            <ui:Button Grid.Row="1" Grid.Column="1" Content="Browse" Style="{StaticResource ActionButton}" Click="BrowseAccount_Click" />
+
+                            <TextBlock Grid.Row="0" Grid.Column="3" Text="Proxy file" Foreground="{StaticResource CarbonMuted}" FontSize="12" Margin="0,0,0,4" />
+                            <TextBox x:Name="ProxyFileTextBox" Grid.Row="1" Grid.Column="3" Margin="0,0,8,0" />
+                            <ui:Button Grid.Row="1" Grid.Column="4" Content="Browse" Style="{StaticResource ActionButton}" Click="BrowseProxy_Click" />
+                        </Grid>
+
+                        <TextBlock Text="AVAILABLE TAGS" Style="{StaticResource SectionTitleText}" Margin="0,0,0,4" />
+                        <TextBlock Foreground="{StaticResource CarbonSubtle}" FontSize="11" Margin="0,0,0,8"
+                                   Text="Drag tags into the format box below. Drag out or click × to remove." />
+                        <ItemsControl x:Name="AvailableTagsPanel"
+                                      AllowDrop="True"
+                                      Margin="0,0,0,12"
+                                      DragOver="PaletteTags_DragOver"
+                                      Drop="AvailableTags_Drop">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource FormatTagChip}"
+                                            Tag="Available"
+                                            PreviewMouseLeftButtonDown="FormatTag_PreviewMouseLeftButtonDown"
+                                            PreviewMouseMove="FormatTag_PreviewMouseMove">
+                                        <TextBlock Text="{Binding Title}" Foreground="{StaticResource CarbonText}" />
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <TextBlock Text="FORMAT BOX" Style="{StaticResource SectionTitleText}" Margin="0,0,0,6" />
+                        <Border x:Name="FormatDropZone"
+                                Style="{StaticResource FormatDropZone}"
+                                AllowDrop="True"
+                                DragOver="FormatDropZone_DragOver"
+                                Drop="FormatDropZone_Drop">
+                            <Grid>
+                                <TextBlock x:Name="FormatDropHintTextBlock"
+                                           Text="Drop tags here to build column order"
+                                           Foreground="{StaticResource CarbonSubtle}"
+                                           FontSize="12"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Center"
+                                           IsHitTestVisible="False" />
+                                <ItemsControl x:Name="FormatSequencePanel">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource FormatTagChip}"
+                                                    Tag="Sequence"
+                                                    Background="{StaticResource CarbonGreenFill}"
+                                                    BorderBrush="{StaticResource CarbonGreenBright}"
+                                                    PreviewMouseLeftButtonDown="FormatTag_PreviewMouseLeftButtonDown"
+                                                    PreviewMouseMove="FormatTag_PreviewMouseMove">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding Title}"
+                                                               Foreground="{StaticResource CarbonText}"
+                                                               VerticalAlignment="Center" />
+                                                    <Button Content="×"
+                                                            Margin="10,0,0,0"
+                                                            Padding="4,0"
+                                                            MinWidth="20"
+                                                            MinHeight="20"
+                                                            Background="Transparent"
+                                                            BorderThickness="0"
+                                                            Foreground="{StaticResource CarbonMuted}"
+                                                            Cursor="Hand"
+                                                            Click="RemoveFormatTag_Click" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Grid>
+                        </Border>
+                        <TextBlock x:Name="FormatPreviewTextBlock"
+                                   Foreground="{StaticResource CarbonSubtle}"
+                                   FontSize="11"
+                                   Margin="0,8,0,0" />
+
+                        <TextBlock Text="ADDITIONAL TAGS" Style="{StaticResource SectionTitleText}" Margin="0,12,0,4" />
+                        <TextBlock Foreground="{StaticResource CarbonSubtle}" FontSize="11" Margin="0,0,0,6"
+                                   Text="Optional columns. Type a name and press Enter." />
+                        <Border x:Name="AdditionalTagsDropZone"
+                                AllowDrop="True"
+                                Background="Transparent"
+                                BorderBrush="{StaticResource CarbonDivider}"
+                                BorderThickness="1"
+                                CornerRadius="12"
+                                Padding="8"
+                                Margin="0,0,0,4"
+                                DragOver="PaletteTags_DragOver"
+                                Drop="AdditionalTags_Drop">
+                            <WrapPanel>
+                                <ItemsControl x:Name="AdditionalTagsPanel">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Style="{StaticResource FormatTagChip}"
+                                                    Tag="Additional"
+                                                    Background="{StaticResource CarbonSurface}"
+                                                    PreviewMouseLeftButtonDown="FormatTag_PreviewMouseLeftButtonDown"
+                                                    PreviewMouseMove="FormatTag_PreviewMouseMove">
+                                                <TextBlock Text="{Binding Title}" Foreground="{StaticResource CarbonText}" />
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <Border Style="{StaticResource FormatTagChip}"
+                                        Background="{StaticResource CarbonSurface}"
+                                        Padding="10,4"
+                                        MinWidth="120">
+                                    <TextBox x:Name="NewTagTextBox"
+                                             MinWidth="100"
+                                             Height="26"
+                                             BorderThickness="0"
+                                             Background="Transparent"
+                                             Foreground="{StaticResource CarbonText}"
+                                             CaretBrush="{StaticResource CarbonText}"
+                                             VerticalContentAlignment="Center"
+                                             ToolTip="New tag name, press Enter"
+                                             KeyDown="NewTagTextBox_KeyDown">
+                                        <TextBox.Resources>
+                                            <Style TargetType="{x:Type TextBox}">
+                                                <Setter Property="Background" Value="Transparent" />
+                                            </Style>
+                                        </TextBox.Resources>
+                                    </TextBox>
+                                </Border>
+                            </WrapPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Grid>
+
+        <Border Grid.Row="2" Style="{StaticResource FluentStatusBar}">
+            <Grid Margin="16,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock VerticalAlignment="Center"
+                           FontSize="12"
+                           Foreground="{StaticResource CarbonSubtle}"
+                           Text="Settings are saved when you click Save." />
+                <ui:Button Grid.Column="1" Content="Cancel" Style="{StaticResource ActionButton}" Margin="0,0,8,0" Click="CloseCancel_Click" />
+                <ui:Button Grid.Column="2" Content="Save" Style="{StaticResource PrimaryActionButton}" Click="Save_Click" />
+            </Grid>
+        </Border>
+    </Grid>
+</ui:FluentWindow>

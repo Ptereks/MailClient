@@ -1,0 +1,120 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>ZennoVibe.MailClient</RootNamespace>
+    <AssemblyName>MailClient</AssemblyName>
+    <Product>Yahoo AOL Mail Client</Product>
+    <AssemblyTitle>Yahoo AOL Mail Client</AssemblyTitle>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    <Version>1.11.8</Version>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeAllContentForSelfExtract>false</IncludeAllContentForSelfExtract>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <PublishDir>$(MSBuildProjectDirectory)\dist-alpha\</PublishDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LiteDB" Version="5.0.21" />
+    <PackageReference Include="MailKit" Version="4.17.0" />
+    <PackageReference Include="Markdig" Version="0.37.0" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2792.45" GeneratePathProperty="true" />
+    <PackageReference Include="WPF-UI" Version="4.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\AppIcon.ico" />
+    <EmbeddedResource Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-x64\native\WebView2Loader.dll"
+                      LogicalName="ZennoVibe.WebView2Loader.win-x64.dll" />
+    <Content Include="README.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Include="data\proxy.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Include="data\account.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Include="data\runtime\.gitkeep">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Include="data\runtime\JetBrainsMono-Regular.ttf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Include="data\runtime\JetBrainsMono-SemiBold.ttf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+    <Content Include="data\runtime\JetBrainsMono-OFL.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+    </Content>
+  </ItemGroup>
+
+  <Target Name="StageWebView2RuntimeToData" AfterTargets="Build">
+    <PropertyGroup>
+      <WebView2LoaderSource>$(OutDir)runtimes\win-x64\native\WebView2Loader.dll</WebView2LoaderSource>
+      <WebView2LoaderTarget>$(OutDir)data\runtime\WebView2Loader.dll</WebView2LoaderTarget>
+    </PropertyGroup>
+    <MakeDir Directories="$(OutDir)data\runtime" Condition="!Exists('$(OutDir)data\runtime')" />
+    <Copy SourceFiles="$(WebView2LoaderSource)"
+          DestinationFiles="$(WebView2LoaderTarget)"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(WebView2LoaderSource)')" />
+  </Target>
+
+  <Target Name="OrganizeDistAlpha" AfterTargets="Publish">
+    <PropertyGroup>
+      <DistWebView2LoaderSource>$(PublishDir)runtimes\win-x64\native\WebView2Loader.dll</DistWebView2LoaderSource>
+      <DistWebView2LoaderTarget>$(PublishDir)data\runtime\WebView2Loader.dll</DistWebView2LoaderTarget>
+    </PropertyGroup>
+    <MakeDir Directories="$(PublishDir)data\runtime" Condition="!Exists('$(PublishDir)data\runtime')" />
+    <Copy SourceFiles="$(DistWebView2LoaderSource)"
+          DestinationFiles="$(DistWebView2LoaderTarget)"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(DistWebView2LoaderSource)')" />
+    <RemoveDir Directories="$(PublishDir)runtimes" Condition="Exists('$(PublishDir)runtimes')" />
+    <RemoveDir Directories="$(PublishDir)MailClient.exe.WebView2" Condition="Exists('$(PublishDir)MailClient.exe.WebView2')" />
+    <ItemGroup>
+      <DistDocRemove Include="$(PublishDir)*.xml" />
+    </ItemGroup>
+    <Delete Files="@(DistDocRemove)" ContinueOnError="true" />
+    <Delete Files="$(PublishDir)data\runtime\.gitkeep" ContinueOnError="true" />
+  </Target>
+
+  <Target Name="CleanDistAlpha" AfterTargets="OrganizeDistAlpha">
+    <ItemGroup>
+      <DistRemove Include="$(PublishDir)*.dll" />
+      <DistRemove Include="$(PublishDir)*.deps.json" />
+      <DistRemove Include="$(PublishDir)*.runtimeconfig.json" />
+      <DistRemove Include="$(PublishDir)*.pdb" />
+      <DistRemove Include="$(PublishDir)corehost.log" />
+    </ItemGroup>
+    <Delete Files="@(DistRemove)" ContinueOnError="true" />
+    <RemoveDir Directories="$(MSBuildProjectDirectory)\bin" ContinueOnError="true" />
+  </Target>
+
+</Project>

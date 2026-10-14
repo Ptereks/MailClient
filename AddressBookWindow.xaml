@@ -1,0 +1,172 @@
+<ui:FluentWindow x:Class="ZennoVibe.MailClient.AddressBookWindow"
+        x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:local="clr-namespace:ZennoVibe.MailClient"
+        Title="Address book"
+        Width="980"
+        Height="680"
+        MinWidth="720"
+        MinHeight="480"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip"
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="None"
+        Icon="/Assets/AppIcon.ico"
+        Background="{StaticResource CarbonBackground}">
+
+    <Grid Background="{StaticResource CarbonBackground}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar x:Name="AddressBookTitleBar"
+                     Grid.Row="0"
+                     Title="Address book"
+                     ShowMaximize="False"
+                     ShowMinimize="False"
+                     ShowClose="False">
+            <ui:TitleBar.Icon>
+                <ui:ImageIcon Source="pack://application:,,,/Assets/AppIcon.ico"
+                              Width="16"
+                              Height="16" />
+            </ui:TitleBar.Icon>
+            <ui:TitleBar.TrailingContent>
+                <local:CaptionButtons ShowMaximize="True" />
+            </ui:TitleBar.TrailingContent>
+        </ui:TitleBar>
+
+        <DockPanel Grid.Row="1" Margin="16,8,16,8">
+            <TextBlock x:Name="CountTextBlock"
+                       DockPanel.Dock="Right"
+                       Foreground="{StaticResource CarbonSubtle}"
+                       FontSize="12"
+                       VerticalAlignment="Center"
+                       Margin="12,0,0,0" />
+            <Grid>
+                <TextBox x:Name="FilterTextBox"
+                         Padding="36,8,10,8"
+                         ToolTip="Filter by address or note"
+                         TextChanged="FilterTextBox_TextChanged" />
+                <ui:SymbolIcon Symbol="Search24"
+                               FontSize="16"
+                               Foreground="{StaticResource CarbonMuted}"
+                               HorizontalAlignment="Left"
+                               VerticalAlignment="Center"
+                               Margin="12,0,0,0"
+                               IsHitTestVisible="False" />
+                <TextBlock x:Name="FilterPlaceholderTextBlock"
+                           Text="Filter by address or note"
+                           Foreground="{StaticResource CarbonSubtle}"
+                           FontSize="12"
+                           HorizontalAlignment="Left"
+                           VerticalAlignment="Center"
+                           Margin="38,0,0,0"
+                           IsHitTestVisible="False" />
+            </Grid>
+        </DockPanel>
+
+        <Border Grid.Row="2"
+                Margin="16,0,16,8"
+                Padding="4"
+                CornerRadius="10"
+                Background="{StaticResource CarbonSurface}"
+                BorderBrush="{StaticResource CarbonBorder}"
+                BorderThickness="1">
+            <ListView x:Name="ContactsListView"
+                      ToolTip="The copy icon copies the address. Edit a note directly in the Note column."
+                      SelectionChanged="ContactsListView_SelectionChanged"
+                      MouseDoubleClick="ContactsListView_MouseDoubleClick"
+                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListView.View>
+                    <GridView>
+                        <GridViewColumn Width="40">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <ui:Button Style="{StaticResource IconToolButton}"
+                                               Padding="4"
+                                               ToolTip="Copy email address"
+                                               Click="CopyRowEmail_Click">
+                                        <ui:SymbolIcon Symbol="Copy24"
+                                                       FontSize="14"
+                                                       Foreground="#FFFFFF" />
+                                    </ui:Button>
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+                        <GridViewColumn x:Name="EmailColumn" Header="Email" Width="300" DisplayMemberBinding="{Binding Email}" />
+                        <GridViewColumn x:Name="NoteColumn" Header="Note" Width="420">
+                            <GridViewColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBox Text="{Binding Note, UpdateSourceTrigger=PropertyChanged}"
+                                             BorderThickness="0"
+                                             Background="Transparent"
+                                             Foreground="{StaticResource CarbonText}"
+                                             MaxLength="400"
+                                             Padding="2,4"
+                                             ToolTip="Note for this address"
+                                             LostFocus="NoteCell_LostFocus"
+                                             KeyDown="NoteCell_KeyDown" />
+                                </DataTemplate>
+                            </GridViewColumn.CellTemplate>
+                        </GridViewColumn>
+                        <GridViewColumn x:Name="SeenCountColumn" Header="Messages" Width="90" DisplayMemberBinding="{Binding SeenCount}" />
+                        <GridViewColumn x:Name="LastSeenColumn" Header="Last seen" Width="110" DisplayMemberBinding="{Binding LastSeenUtc, StringFormat='{}{0:yyyy-MM-dd}'}" />
+                    </GridView>
+                </ListView.View>
+                <ListView.ContextMenu>
+                    <ContextMenu Style="{StaticResource DarkContextMenu}">
+                        <MenuItem Header="Copy email address"
+                                  Style="{StaticResource DarkMenuItem}"
+                                  Click="CopyEmail_Click" />
+                    </ContextMenu>
+                </ListView.ContextMenu>
+            </ListView>
+        </Border>
+
+        <Border Grid.Row="3" Style="{StaticResource FluentStatusBar}">
+            <Grid Margin="16,10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock x:Name="SelectedEmailTextBlock"
+                           Grid.Row="0"
+                           Grid.Column="0"
+                           Grid.ColumnSpan="2"
+                           Foreground="{StaticResource CarbonMuted}"
+                           FontSize="12"
+                           Margin="0,0,0,6"
+                           TextTrimming="CharacterEllipsis"
+                           Text="Select an address to write a note." />
+
+                <TextBox x:Name="NoteTextBox"
+                         Grid.Row="1"
+                         Grid.Column="0"
+                         IsEnabled="False"
+                         MaxLength="400"
+                         ToolTip="Note for the selected address"
+                         KeyDown="NoteTextBox_KeyDown" />
+
+                <ui:Button x:Name="SaveNoteButton"
+                           Grid.Row="1"
+                           Grid.Column="1"
+                           Content="Save note"
+                           Style="{StaticResource ActionButton}"
+                           Margin="8,0,0,0"
+                           IsEnabled="False"
+                           Click="SaveNote_Click" />
+
+            </Grid>
+        </Border>
+    </Grid>
+</ui:FluentWindow>

@@ -1,0 +1,97 @@
+<ui:FluentWindow x:Class="ZennoVibe.MailClient.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:local="clr-namespace:ZennoVibe.MailClient"
+        Title="About"
+        Width="392"
+        SizeToContent="Height"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        ExtendsContentIntoTitleBar="True"
+        WindowBackdropType="None"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        Icon="/Assets/AppIcon.ico"
+        Background="{StaticResource CarbonBackground}">
+
+    <DockPanel Background="{StaticResource CarbonBackground}"
+               LastChildFill="True">
+        <ui:TitleBar x:Name="AboutTitleBar"
+                     DockPanel.Dock="Top"
+                     Title="About"
+                     ShowMaximize="False"
+                     ShowMinimize="False"
+                     ShowClose="False">
+            <ui:TitleBar.Icon>
+                <ui:ImageIcon Source="pack://application:,,,/Assets/AppIcon.ico"
+                              Width="16"
+                              Height="16" />
+            </ui:TitleBar.Icon>
+            <ui:TitleBar.TrailingContent>
+                <local:CaptionButtons />
+            </ui:TitleBar.TrailingContent>
+        </ui:TitleBar>
+
+        <Border Margin="20"
+                Padding="20,16"
+                CornerRadius="12"
+                Background="{StaticResource CarbonGlassCard}"
+                BorderBrush="{StaticResource CarbonGlassCardBorder}"
+                BorderThickness="1"
+                VerticalAlignment="Top">
+            <StackPanel HorizontalAlignment="Center">
+                <ui:ImageIcon Source="pack://application:,,,/Assets/AppIcon.ico"
+                              Width="48"
+                              Height="48"
+                              Margin="0,0,0,12"
+                              HorizontalAlignment="Center" />
+                <TextBlock x:Name="ProductNameTextBlock"
+                           FontSize="17"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource CarbonText}"
+                           HorizontalAlignment="Center"
+                           TextAlignment="Center"
+                           TextWrapping="Wrap"
+                           MaxWidth="320" />
+                <TextBlock x:Name="VersionTextBlock"
+                           Foreground="{StaticResource CarbonMuted}"
+                           FontSize="13"
+                           Margin="0,4,0,0"
+                           HorizontalAlignment="Center" />
+                <TextBlock Text="CONTACTS"
+                           Style="{StaticResource SectionTitleText}"
+                           Margin="0,16,0,6"
+                           HorizontalAlignment="Center" />
+                <TextBlock Text="Telegram:"
+                           Foreground="{StaticResource CarbonMuted}"
+                           FontSize="13"
+                           HorizontalAlignment="Center" />
+                <Border Margin="0,8,0,0"
+                        Padding="12,8"
+                        CornerRadius="8"
+                        Background="{StaticResource CarbonSurface}"
+                        BorderBrush="{StaticResource CarbonBorder}"
+                        BorderThickness="1"
+                        Cursor="Hand"
+                        ToolTip="Open Telegram"
+                        MouseLeftButtonUp="OpenTelegram">
+                    <StackPanel HorizontalAlignment="Center">
+                        <TextBlock x:Name="TelegramHandleTextBlock"
+                                   FontSize="15"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource CarbonGreenBright}"
+                                   HorizontalAlignment="Center" />
+                        <TextBlock x:Name="TelegramUrlTextBlock"
+                                   FontSize="13"
+                                   Foreground="{StaticResource CarbonText}"
+                                   Margin="0,3,0,0"
+                                   HorizontalAlignment="Center"
+                                   TextDecorations="Underline" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Border>
+    </DockPanel>
+</ui:FluentWindow>
