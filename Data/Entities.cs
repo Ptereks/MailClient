@@ -15,7 +15,16 @@ internal sealed class AccountEntity
 {
     public int Id { get; set; }
     public string Email { get; set; } = "";
+    /// <summary>IMAP/SMTP secret: app password when the import line carried one, otherwise the password column.</summary>
     public string Password { get; set; } = "";
+
+    /// <summary>
+    /// Account password from the password column, when sign-in uses a separate app password
+    /// stored in <see cref="Password"/>. Empty for OAuth accounts and for lines whose
+    /// password column is already the app password.
+    /// </summary>
+    public string MailboxPassword { get; set; } = "";
+
     public string Phone { get; set; } = "";
     public string Site { get; set; } = "yahoo";
     public string AccessToken { get; set; } = "";

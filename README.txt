@@ -1,4 +1,4 @@
-# Yahoo & AOL Mail Client 1.11.8
+# Yahoo & AOL Mail Client 1.11.9
 
 Reads Yahoo and AOL mailboxes over IMAP and sends through their SMTP. A refresh token signs in with OAuth (XOAUTH2); an account without one uses the password column as an app password. Every connection goes through a proxy; without one the program refuses to connect. Windows 10 or 11, 64-bit.
 
@@ -13,7 +13,7 @@ Install the **.NET 8 Desktop Runtime**, x64 (`winget install Microsoft.DotNet.De
 mail:password:phone:access_token:refresh_token
 ```
 
-A short last field with `~001~` is a refresh token. Leave it empty and put the app password in the password column.
+A short last field with `~001~` is a refresh token. A last field of 16 letters (spaces allowed) is an app password: the password column stays the account password, and sign-in uses the app password. A line of just `mail:password` signs in with that password. Leave the last field empty and put the app password in the password column when you have no separate account password.
 
 `data\proxy.txt` — one proxy per line:
 

@@ -11,7 +11,7 @@
     <Product>Yahoo AOL Mail Client</Product>
     <AssemblyTitle>Yahoo AOL Mail Client</AssemblyTitle>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
-    <Version>1.11.8</Version>
+    <Version>1.11.9</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 

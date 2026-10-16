@@ -1,1 +1,3 @@
-# mail:password:phone:refresh_token
+# mail:password:phone:access_token:refresh_token
+# mail:password:phone:app_password
+# mail:password

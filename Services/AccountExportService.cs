@@ -49,10 +49,15 @@ internal sealed class AccountExportService
         var values = columns.Select(column => column.Key switch
         {
             "mail" => account.Email,
-            "password" => account.Password,
+            "password" => string.IsNullOrEmpty(account.MailboxPassword) ? account.Password : account.MailboxPassword,
             "phone" => account.Phone,
             "access_token" => account.AccessToken,
-            "refresh_token" => account.RefreshToken,
+            // The app password rides in the refresh column only so a later import finds it again.
+            "refresh_token" => account.RefreshToken.Length == 0 &&
+                               account.MailboxPassword.Length > 0 &&
+                               account.MailboxPassword != account.Password
+                ? account.Password
+                : account.RefreshToken,
             _ => ""
         });
 

@@ -20,6 +20,22 @@ internal static class OAuthTokenClassifier
     }
 
     /// <summary>
+    /// Yahoo and AOL app passwords are 16 letters, sometimes shown in groups of four.
+    /// A refresh token is never this shape.
+    /// </summary>
+    public static bool IsAppPassword(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value) || IsRefreshToken(value) || IsAccessToken(value))
+            return false;
+
+        var compact = NormalizeAppPassword(value);
+        return compact.Length == 16 && compact.All(char.IsLetter);
+    }
+
+    public static string NormalizeAppPassword(string value) =>
+        string.Concat(value.Where(c => !char.IsWhiteSpace(c)));
+
+    /// <summary>
     /// Access tokens are long JWT-like strings with many dot-separated segments.
     /// </summary>
     public static bool IsAccessToken(string value)

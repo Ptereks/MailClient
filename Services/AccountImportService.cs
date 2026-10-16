@@ -153,6 +153,7 @@ internal sealed class AccountImportService
         {
             Email = record.Email,
             Password = record.Password,
+            MailboxPassword = record.MailboxPassword,
             Phone = record.Phone,
             AccessToken = record.AccessToken,
             RefreshToken = record.RefreshToken,
@@ -166,6 +167,7 @@ internal sealed class AccountImportService
     private static void ApplyRecord(AccountEntity account, MailRecord record, string site)
     {
         account.Password = record.Password;
+        account.MailboxPassword = record.MailboxPassword;
         account.Phone = record.Phone;
         account.RefreshToken = record.RefreshToken;
         account.Site = site;
