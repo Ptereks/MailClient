@@ -19,6 +19,7 @@ internal sealed class MailRecord
     public string Phone { get; private set; } = "";
     public string AccessToken { get; private set; } = "";
     public string RefreshToken { get; private set; } = "";
+    public ImportedLineKind LineKind { get; private set; } = ImportedLineKind.SettingsFormat;
 
     public static MailRecord Parse(string line, string format, char delimiter)
     {
@@ -113,6 +114,12 @@ internal sealed class MailRecord
 
         if (!record.Email.Contains('@'))
             throw new FormatException("Mail column is not an email address: " + record.Email);
+
+        record.LineKind = twoColumnPassword
+            ? ImportedLineKind.MailAndPassword
+            : appPassword.Length > 0 && record.RefreshToken.Length == 0
+                ? ImportedLineKind.MailPasswordPhoneApp
+                : ImportedLineKind.SettingsFormat;
 
         if (record.RefreshToken.Length == 0)
         {

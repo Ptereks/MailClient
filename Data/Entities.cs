@@ -31,6 +31,9 @@ internal sealed class AccountEntity
     public string RefreshToken { get; set; } = "";
     public AuthMode AuthMode { get; set; } = AuthMode.XOAUTH2;
 
+    /// <summary>Import line shape. Older rows stay <see cref="ImportedLineKind.SettingsFormat"/> and are inferred on export.</summary>
+    public ImportedLineKind ImportedLineKind { get; set; } = ImportedLineKind.SettingsFormat;
+
     /// <summary>Higher value is synced before the rest of the run.</summary>
     public int SyncPriority { get; set; }
 
@@ -208,6 +211,21 @@ internal sealed class MessageEntity
     /// message is opened, which keeps a sync down to one command per folder.
     /// </summary>
     public bool BodyLoaded { get; set; }
+
+    /// <summary>
+    /// True when the sync saw the BODYSTRUCTURE and recorded which MIME parts hold the
+    /// readable body. Opening such a message costs one FETCH instead of two.
+    /// </summary>
+    public bool BodyPartsKnown { get; set; }
+
+    /// <summary>IMAP part specifier of the text/plain body ("" for a single-part message); null when absent or oversized.</summary>
+    public string? TextPartSpecifier { get; set; }
+
+    /// <summary>IMAP part specifier of the text/html body; null when absent or oversized.</summary>
+    public string? HtmlPartSpecifier { get; set; }
+
+    /// <summary>RFC822.SIZE reported by the server; 0 for rows synced by older builds.</summary>
+    public long Size { get; set; }
 
     [BsonIgnore]
     public string AttachmentSummary => AttachmentFileNames is { Count: > 0 } names

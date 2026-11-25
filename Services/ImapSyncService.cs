@@ -15,6 +15,9 @@ internal sealed class ImapSyncService
 {
     private const int InsertBatchSize = 250;
     private const int SmallFolderSinglePassLimit = 20;
+
+    /// <summary>How many of the newest messages get their body downloaded during the sync itself.</summary>
+    private const int PreloadBodyCount = 5;
     private const uint MaxBodyPartOctets = 512 * 1024;
     private const MessageSummaryItems RankingSummaryItems =
         MessageSummaryItems.UniqueId |
@@ -25,11 +28,19 @@ internal sealed class ImapSyncService
         MessageSummaryItems.UniqueId |
         MessageSummaryItems.InternalDate |
         MessageSummaryItems.BodyStructure |
+        // RFC822.SIZE is free in the same FETCH and decides whether a body can be batched.
+        MessageSummaryItems.Size |
         // The thread chain, so a reply can carry the full References header.
         MessageSummaryItems.References;
 
     /// <summary>Hard cap on how many newest messages may be kept for one mailbox.</summary>
     private const int MaxMessages = 2_000;
+
+    /// <summary>
+    /// Whole messages up to this size are pre-loaded in one FETCH for the batch; larger ones
+    /// (or ones with unknown size) fall back to fetching just their text part.
+    /// </summary>
+    private const long PreloadWholeMessageMaxBytes = 512 * 1024;
 
     private readonly TokenService _tokenService = new();
 
@@ -235,6 +246,13 @@ internal sealed class ImapSyncService
             // it already has, so a repeat sync costs one command per folder.
             var options = SyncOptions.Read(db);
             var fullScan = account.SyncedMessageLimit < options.MessageLimit;
+            AppLog.Notice(
+                "sync",
+                "Begin " + account.Email + " via " + proxy.Summary +
+                ": messageLimit=" + options.MessageLimit +
+                " syncedLimit=" + account.SyncedMessageLimit +
+                (fullScan ? " fullScan" : " incremental") +
+                " lastSync=" + (account.LastSyncAt?.ToString("u") ?? "never"));
 
             var session = new ImapSyncSession(
                 client,
@@ -307,6 +325,10 @@ internal sealed class ImapSyncService
             if (!account.AttachmentBackfillDone)
                 account.AttachmentBackfillDone = await BackfillAttachmentInfoAsync(client, db, account, cancellationToken);
 
+            // The newest few messages are what the operator opens first. Their bodies are
+            // pulled now, over this connection, so those clicks never wait for the proxy.
+            await PreloadNewestBodiesAsync(db, account, collected, cancellationToken);
+
             // The limit controls how far the initial history scan reaches. Once a message is
             // stored it remains visible; later runs append only newly arrived mail.
             account.SyncedMessageLimit = options.MessageLimit;
@@ -324,6 +346,13 @@ internal sealed class ImapSyncService
             }
 
             account.LastStoreMs += (int)storeWatch.ElapsedMilliseconds;
+
+            AppLog.Notice(
+                "sync",
+                "Done " + account.Email + ": folders=" + collected.Count +
+                " messagesInDb=" + db.Messages.Count(x => x.AccountId == account.Id) +
+                " token=" + account.LastTokenMs + "ms connect=" + account.LastConnectMs +
+                "ms folders=" + account.LastFoldersMs + "ms store=" + account.LastStoreMs + "ms");
 
             // A broken socket must not turn a finished sync into a failure.
             try
@@ -571,8 +600,18 @@ internal sealed class ImapSyncService
         var db = session.Database;
         var folderEntity = db.GetOrCreateFolder(session.Account.Id, folder.FullName, folder.Name);
 
-        // STATUS is enough to discard empty folders before SELECT. For repeat syncs its
-        // UIDNEXT also lets unchanged non-empty folders avoid OPEN and CLOSE entirely.
+        var email = session.Account.Email;
+        var storedCountBefore = folderEntity.MessageCount;
+
+        // STATUS is enough to discard empty folders before SELECT.
+        //
+        // UIDNEXT is deliberately NOT used to skip a folder. Yahoo/AOL report it as a
+        // "predicted" value that can stay behind the newest delivered uid (their own IMAP
+        // documentation shows SELECT returning UIDNEXT 44627 while message 44627 already
+        // exists), so a "UIDNEXT <= LastUid + 1" shortcut silently hid new Inbox mail on
+        // every repeat sync. Re-importing the account reset LastUid and made it visible
+        // again, which is how the bug was noticed. One FETCH above LastUid per folder is
+        // the only check that holds on these servers.
         if (statusPrefetched && folder.UidValidity != 0)
         {
             if (folderEntity.UidValidity != folder.UidValidity)
@@ -591,13 +630,8 @@ internal sealed class ImapSyncService
 
             if (folder.Count == 0 &&
                 !(folder.UidNext.HasValue && folder.UidNext.Value.Id > 1))
-                return;
-
-            if (!fullScan &&
-                folderEntity.LastUid > 0 &&
-                folder.UidNext.HasValue &&
-                (ulong)folder.UidNext.Value.Id <= (ulong)folderEntity.LastUid + 1)
             {
+                LogFolder(email, folderFullName, folder, folderEntity, storedCountBefore, fullScan, "skip: empty (STATUS)");
                 return;
             }
         }
@@ -638,18 +672,13 @@ internal sealed class ImapSyncService
         db.Folders.Update(folderEntity);
 
         if (folder.Count == 0)
-            return;
-
-        // SELECT/EXAMINE already supplies UIDNEXT. If it has not moved beyond our
-        // highest stored UID, a FETCH range would be guaranteed to return nothing.
-        if (!fullScan &&
-            folderEntity.LastUid > 0 &&
-            folder.UidNext.HasValue &&
-            (ulong)folder.UidNext.Value.Id <= (ulong)folderEntity.LastUid + 1)
         {
+            LogFolder(email, folderFullName, folder, folderEntity, storedCountBefore, fullScan, "skip: empty (SELECT)");
             return;
         }
 
+        // See the note above: UIDNEXT from SELECT/EXAMINE is not trusted either. A folder
+        // synced before always asks for uids above LastUid; the answer is usually empty.
         var summaries = await FetchSummariesAsync(
             folder,
             folderEntity.LastUid,
@@ -657,23 +686,39 @@ internal sealed class ImapSyncService
             fullScan,
             cancellationToken,
             storeImmediately);
-        if (summaries.Count == 0)
-            return;
 
         // New mail is appended. MessageLimit only controls the initial history window;
         // existing local rows are never removed by a normal sync.
         if (folderEntity.LastUid > 0 && !fullScan)
         {
-            StoreMessages(session, contacts, folderEntity, summaries, cancellationToken);
+            var stored = summaries.Count == 0
+                ? 0
+                : StoreMessages(session, contacts, folderEntity, summaries, cancellationToken);
+            LogFolder(
+                email, folderFullName, folder, folderEntity, storedCountBefore, fullScan,
+                "incremental: fetched=" + summaries.Count + " new=" + stored);
+            return;
+        }
+
+        if (summaries.Count == 0)
+        {
+            LogFolder(email, folderFullName, folder, folderEntity, storedCountBefore, fullScan, "first scan: fetched=0");
             return;
         }
 
         // Inbox/Bulk/Spam must be in the database before the rest of the tree is scanned.
         if (storeImmediately)
         {
-            StoreMessages(session, contacts, folderEntity, summaries, cancellationToken);
+            var stored = StoreMessages(session, contacts, folderEntity, summaries, cancellationToken);
+            LogFolder(
+                email, folderFullName, folder, folderEntity, storedCountBefore, fullScan,
+                "first scan (priority): fetched=" + summaries.Count + " new=" + stored);
             return;
         }
+
+        LogFolder(
+            email, folderFullName, folder, folderEntity, storedCountBefore, fullScan,
+            "first scan: fetched=" + summaries.Count + ", stored after the walk");
 
         scanned.Add(new ScannedFolder(
             folderEntity,
@@ -782,6 +827,151 @@ internal sealed class ImapSyncService
         }
     }
 
+    /// <summary>
+    /// Bodies of the newest <see cref="PreloadBodyCount"/> messages of the account, fetched
+    /// over the sync connection while it is still open. Small messages of one folder go in a
+    /// single <c>UID FETCH a,b,c (BODY.PEEK[])</c>; the rest cost one command each. Folders
+    /// come from the walk that just ran, so no LIST is needed. Any failure here is logged
+    /// and the sync still counts as done.
+    /// </summary>
+    private static async Task PreloadNewestBodiesAsync(
+        MailDatabase db,
+        AccountEntity account,
+        List<CollectedFolder> collected,
+        CancellationToken cancellationToken)
+    {
+        var watch = Stopwatch.StartNew();
+        var fetched = 0;
+        var batched = 0;
+        var skipped = 0;
+        var commands = 0;
+        try
+        {
+            var newest = db.Messages.Query()
+                .Where(x => x.AccountId == account.Id)
+                .OrderByDescending(x => x.DateUtc)
+                .Limit(PreloadBodyCount)
+                .ToList()
+                .Where(x => !x.BodyLoaded)
+                .ToList();
+
+            foreach (var group in newest.GroupBy(x => x.FolderId))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var folderEntity = db.Folders.FindById(group.Key);
+                var folder = folderEntity == null
+                    ? null
+                    : collected
+                        .Select(x => x.Folder)
+                        .FirstOrDefault(x => string.Equals(x.FullName, folderEntity.FullName, StringComparison.Ordinal));
+                if (folder == null)
+                {
+                    skipped += group.Count();
+                    continue;
+                }
+
+                if (!folder.IsOpen)
+                    await folder.OpenAsync(FolderAccess.ReadOnly, cancellationToken);
+
+                var whole = new List<MessageEntity>();
+                var singles = new List<MessageEntity>();
+                foreach (var message in group)
+                {
+                    // Whole-message fetch is only worth it when the size is known and small:
+                    // an attachment would otherwise ride along for nothing.
+                    if (folder is ImapFolder &&
+                        message.Size > 0 &&
+                        message.Size <= PreloadWholeMessageMaxBytes &&
+                        !message.HasAttachments)
+                    {
+                        whole.Add(message);
+                    }
+                    else
+                    {
+                        singles.Add(message);
+                    }
+                }
+
+                if (whole.Count > 0)
+                {
+                    commands++;
+                    var byUid = whole.ToDictionary(x => x.Uid);
+                    var imapFolder = (ImapFolder)folder;
+                    await imapFolder.GetStreamsAsync(
+                        whole.Select(x => new UniqueId(x.Uid)).ToList(),
+                        async (_, _, uid, stream, token) =>
+                        {
+                            if (!byUid.TryGetValue(uid.Id, out var message))
+                                return;
+
+                            try
+                            {
+                                var mime = await MimeMessage.LoadAsync(stream, token);
+                                var text = mime.TextBody ?? "";
+                                var html = mime.HtmlBody ?? "";
+                                if (text.Length > 0 || html.Length > 0)
+                                {
+                                    db.SaveMessageBody(message, text, html);
+                                    fetched++;
+                                    batched++;
+                                }
+                                else
+                                {
+                                    // Nothing readable inside: remember so clicks do not refetch.
+                                    message.BodyLoaded = true;
+                                    db.Messages.Update(message);
+                                    skipped++;
+                                }
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                throw;
+                            }
+                            catch (Exception ex)
+                            {
+                                skipped++;
+                                AppLog.Warning(
+                                    "sync.preload",
+                                    "Could not parse pre-loaded uid=" + uid.Id + " for " + account.Email,
+                                    ex);
+                            }
+                        },
+                        cancellationToken);
+                }
+
+                foreach (var message in singles)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    commands++;
+                    var body = await MessageBodyLoader.FetchAsync(db, folder, message, cancellationToken);
+                    if (body.Text.Length > 0 || body.Html.Length > 0)
+                    {
+                        db.SaveMessageBody(message, body.Text, body.Html);
+                        fetched++;
+                    }
+                    else
+                    {
+                        skipped++;
+                    }
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            AppLog.Warning("sync.preload", "Body pre-load for " + account.Email + " stopped early.", ex);
+        }
+
+        AppLog.Notice(
+            "sync.preload",
+            account.Email + ": bodies fetched=" + fetched + " (batched=" + batched + ") skipped=" + skipped +
+            " commands=" + commands + " in " + watch.ElapsedMilliseconds + "ms");
+    }
+
     /// <summary>Returns true when every stored message of the account now has attachment info.</summary>
     private static async Task<bool> BackfillAttachmentInfoAsync(
         ImapClient client,
@@ -876,7 +1066,8 @@ internal sealed class ImapSyncService
         return names;
     }
 
-    private static void StoreMessages(
+    /// <summary>Returns how many rows were newly inserted (duplicates and skipped rows excluded).</summary>
+    private static int StoreMessages(
         ImapSyncSession session,
         Dictionary<string, ContactSeed> contacts,
         FolderEntity folderEntity,
@@ -890,6 +1081,7 @@ internal sealed class ImapSyncService
             .Select(x => x.Uid)
             .ToHashSet();
         var skipped = 0;
+        var inserted = 0;
         var highestUid = folderEntity.LastUid;
 
         foreach (var summary in summaries)
@@ -910,6 +1102,7 @@ internal sealed class ImapSyncService
             try
             {
                 batch.Add(BuildMessage(db.NextMessageId(), session.Account, folderEntity, summary));
+                inserted++;
 
                 if (summary.UniqueId.Id > highestUid)
                     highestUid = summary.UniqueId.Id;
@@ -957,6 +1150,34 @@ internal sealed class ImapSyncService
                 "Folder '" + folderEntity.FullName + "' for " + session.Account.Email +
                 ": skipped " + skipped + " of " + summaries.Count + " message(s).");
         }
+
+        return inserted;
+    }
+
+    /// <summary>
+    /// One line per folder per sync. Together with the account OK/FAIL lines this is what a
+    /// user attaches when mail is missing: it shows the server counters the decision was
+    /// based on and how many rows actually reached the database.
+    /// </summary>
+    private static void LogFolder(
+        string email,
+        string folderFullName,
+        IMailFolder folder,
+        FolderEntity folderEntity,
+        int storedCountBefore,
+        bool fullScan,
+        string outcome)
+    {
+        AppLog.Notice(
+            "sync.folder",
+            email + " '" + folderFullName + "': " + outcome +
+            " | server count=" + folder.Count +
+            " unread=" + folder.Unread +
+            " uidnext=" + (folder.UidNext.HasValue ? folder.UidNext.Value.Id.ToString() : "?") +
+            " uidvalidity=" + folder.UidValidity +
+            " | local lastUid=" + folderEntity.LastUid +
+            " countBefore=" + storedCountBefore +
+            (fullScan ? " fullScan" : ""));
     }
 
     /// <summary>
@@ -1040,6 +1261,12 @@ internal sealed class ImapSyncService
         }
 
         var entity = await folder.GetBodyPartAsync(uid, part, cancellationToken, new BodyTransferProgress(progress));
+        return ReadTextEntity(entity);
+    }
+
+    /// <summary>Decoded text of a fetched body part; empty when the part is not text.</summary>
+    internal static string ReadTextEntity(MimeEntity? entity)
+    {
         if (entity is TextPart textPart)
             return textPart.Text ?? "";
 
@@ -1048,12 +1275,24 @@ internal sealed class ImapSyncService
             mimePart.Content != null)
         {
             using var stream = new MemoryStream();
-            await mimePart.Content.DecodeToAsync(stream, cancellationToken);
+            mimePart.Content.DecodeTo(stream);
             var charset = mimePart.ContentType.CharsetEncoding ?? Encoding.UTF8;
             return charset.GetString(stream.ToArray());
         }
 
         return "";
+    }
+
+    /// <summary>
+    /// The specifier the body loader can fetch directly. A part the loader would refuse
+    /// anyway (oversized) is not recorded, so the structure-based path handles it.
+    /// </summary>
+    private static string? PartSpecifierOrNull(BodyPartText? part)
+    {
+        if (part == null || part.Octets > MaxBodyPartOctets)
+            return null;
+
+        return part.PartSpecifier ?? "";
     }
 
     private static MessageEntity BuildMessage(
@@ -1096,6 +1335,12 @@ internal sealed class ImapSyncService
             MessageId = envelope?.MessageId ?? "",
             References = ReadReferences(summary),
             BodyLoaded = false,
+            BodyPartsKnown = summary.Body != null,
+            TextPartSpecifier = PartSpecifierOrNull(summary.TextBody),
+            HtmlPartSpecifier = ReferenceEquals(summary.HtmlBody, summary.TextBody)
+                ? null
+                : PartSpecifierOrNull(summary.HtmlBody),
+            Size = summary.Size ?? 0,
             Preview = subject,
             SearchText = BuildSearchText(subject, from, to)
         };

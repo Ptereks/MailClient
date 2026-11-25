@@ -6,8 +6,9 @@ using ZennoVibe.MailClient.Data;
 namespace ZennoVibe.MailClient;
 
 /// <summary>
-/// Crash-only log under <c>data/mailclient.log</c>. Routine account, proxy, import and
-/// message errors stay in the UI and never reach this file.
+/// Diagnostic log under <c>data/mailclient.log</c>: crashes, sync/connect failures and one
+/// compact line per folder decision during a sync, so a user report can show why a folder
+/// was fetched or skipped. The previous run is kept as <c>mailclient.log.previous-run</c>.
 /// </summary>
 internal static class AppLog
 {
@@ -30,12 +31,17 @@ internal static class AppLog
         {
             try
             {
-                var previous = LogPath + ".previous-crash";
+                var previous = LogPath + ".previous-run";
+                var legacy = LogPath + ".previous-crash";
                 if (File.Exists(LogPath))
                 {
                     File.Delete(previous);
                     File.Move(LogPath, previous);
                 }
+
+                // Builds before 1.11.10 used this name; keep one copy from upgrading users.
+                if (File.Exists(legacy) && !File.Exists(previous))
+                    File.Move(legacy, previous);
 
                 _headerWritten = false;
             }
@@ -46,19 +52,20 @@ internal static class AppLog
         }
     }
 
-    // Operational failures are already shown beside the affected account/action. Keeping
-    // these methods as no-ops avoids touching every proven network call site.
-    public static void Warning(string category, string message, Exception? ex = null)
-    {
-    }
+    // Operational failures are shown beside the affected account/action too, but the UI
+    // only has room for ex.Message; the file keeps the full chain for bug reports.
+    public static void Warning(string category, string message, Exception? ex = null) =>
+        Write("WARN", category, message, ex);
 
-    public static void Error(string category, string message, Exception? ex = null)
-    {
-    }
+    public static void Error(string category, string message, Exception? ex = null) =>
+        Write("ERROR", category, message, ex);
 
-    public static void Error(string category, string message, MessageEntity messageMeta, Exception? ex = null)
-    {
-    }
+    public static void Error(string category, string message, MessageEntity messageMeta, Exception? ex = null) =>
+        Write(
+            "ERROR",
+            category,
+            message + " [id=" + messageMeta.Id + " uid=" + messageMeta.Uid + " folder=" + messageMeta.FolderId + "]",
+            ex);
 
     public static void Notice(string category, string message) =>
         Write("INFO", category, message, null);

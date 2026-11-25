@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Globalization;
 using System.Windows;
@@ -28,6 +29,9 @@ public partial class MainWindow : FluentWindow
     private const double DefaultPreviewPaneWeight = 1;
     private const double DefaultComposePaneWeight = 2;
     private const int NeighbourPrefetchCount = 5;
+    // The sync already pre-loads the newest five; this only covers accounts synced by
+    // older builds or mail that arrived since.
+    private const int VisiblePrefetchCount = 5;
     private readonly MailDatabase _db = new(MailDatabase.DefaultPath);
     private readonly SyncOrchestrator _syncOrchestrator = new();
     private readonly AccountExportService _accountExportService = new();
@@ -36,6 +40,8 @@ public partial class MainWindow : FluentWindow
     private readonly AttachmentDownloadService _attachmentDownloader = new();
     private readonly DispatcherTimer _searchDebounce;
     private readonly DispatcherTimer _accountFilterDebounce;
+    private readonly DispatcherTimer _sessionWarmupDebounce;
+    private Task? _sessionWarmupTask;
     private CancellationTokenSource? _syncCancellation;
     private CancellationTokenSource? _bodyFetchCancellation;
     private CancellationTokenSource? _attachmentDownloadCancellation;
@@ -98,6 +104,16 @@ public partial class MainWindow : FluentWindow
         {
             _accountFilterDebounce.Stop();
             ReloadAccounts();
+        };
+
+        _sessionWarmupDebounce = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(500)
+        };
+        _sessionWarmupDebounce.Tick += (_, _) =>
+        {
+            _sessionWarmupDebounce.Stop();
+            WarmUpBodySession();
         };
 
         WindowGlassChrome.Apply(this);
@@ -1101,7 +1117,79 @@ public partial class MainWindow : FluentWindow
         UpdateComposePanel();
 
         if (_selectedAccount != null)
+        {
             _ = EnsureAccessTokenCurrentAsync(_selectedAccount);
+            ScheduleBodySessionWarmUp();
+        }
+    }
+
+    /// <summary>
+    /// Half a second after the operator settles on an account or folder, the body loader
+    /// connects in the background so the first message click is served from a warm session.
+    /// Arrow-keying through the account list therefore costs no connections at all.
+    /// </summary>
+    private void ScheduleBodySessionWarmUp()
+    {
+        _sessionWarmupDebounce.Stop();
+        _sessionWarmupDebounce.Start();
+    }
+
+    private void WarmUpBodySession()
+    {
+        var account = _selectedAccount;
+        if (account == null || _syncRunning || IsAccountSyncing(account.Id))
+            return;
+
+        if (_sessionWarmupTask is { IsCompleted: false })
+            return;
+
+        List<ProxySpec> proxies;
+        try
+        {
+            proxies = LoadProxies();
+        }
+        catch
+        {
+            return;
+        }
+
+        var folder = _selectedFolder;
+        var start = ProxyStartIndex(account, proxies);
+        var token = _lifetimeCancellation.Token;
+        _tokenRefreshTasks.TryGetValue(account.Id, out var tokenRefresh);
+
+        _sessionWarmupTask = Task.Run(async () =>
+        {
+            // If the hourly refresh is in flight, let it finish first so the session is
+            // opened with the token that will be stored, not one about to be replaced.
+            if (tokenRefresh != null)
+            {
+                try
+                {
+                    await tokenRefresh;
+                }
+                catch
+                {
+                    return;
+                }
+            }
+
+            await _bodyLoader.WarmUpAsync(_db, account, folder, proxies, start, token);
+        }, token);
+
+        _sessionWarmupTask.ContinueWith(
+            _ =>
+            {
+                if (_selectedAccount?.Id == account.Id &&
+                    ReferenceEquals(_selectedFolder, folder) &&
+                    _bodyLoader.HasLiveSession(account.Id))
+                {
+                    StartVisiblePrefetch(account.Id);
+                }
+            },
+            token,
+            TaskContinuationOptions.OnlyOnRanToCompletion,
+            TaskScheduler.FromCurrentSynchronizationContext());
     }
 
     /// <summary>
@@ -1241,7 +1329,10 @@ public partial class MainWindow : FluentWindow
         ReloadMessages();
         ClearPreview();
         if (_selectedAccount != null)
+        {
             _ = EnsureAccessTokenCurrentAsync(_selectedAccount);
+            ScheduleBodySessionWarmUp();
+        }
     }
 
     private async void AccountSyncButton_Click(object sender, RoutedEventArgs e)
@@ -1308,6 +1399,8 @@ public partial class MainWindow : FluentWindow
             ReloadAccounts();
             ReloadFolders();
             ReloadMessages();
+            if (_selectedAccount != null)
+                ScheduleBodySessionWarmUp();
             _addressBook?.RefreshFromDatabase();
         }
         catch (OperationCanceledException)
@@ -1481,6 +1574,7 @@ public partial class MainWindow : FluentWindow
                 ClearFolderSelection();
                 ReloadFolders();
                 ReloadMessages();
+                ScheduleBodySessionWarmUp();
             }
 
             _addressBook?.RefreshFromDatabase();
@@ -1766,6 +1860,9 @@ public partial class MainWindow : FluentWindow
     private void SaveAccounts_Click(object sender, RoutedEventArgs e) =>
         SaveAllAccountsToFile();
 
+    private void SaveLiveAccounts_Click(object sender, RoutedEventArgs e) =>
+        SaveLiveAccountsToFile();
+
     private void DeleteAccountMenu_Click(object sender, RoutedEventArgs e) =>
         DeleteSelectedAccount();
 
@@ -1825,6 +1922,62 @@ public partial class MainWindow : FluentWindow
             System.Windows.MessageBox.Show(this,
                 ex.Message,
                 "Save accounts failed",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Error);
+        }
+    }
+
+    private void SaveLiveAccountsToFile()
+    {
+        if (_syncRunning)
+        {
+            System.Windows.MessageBox.Show(this,
+                "Wait until sync finishes before saving accounts.",
+                "Export live accounts",
+                System.Windows.MessageBoxButton.OK,
+                System.Windows.MessageBoxImage.Information);
+            return;
+        }
+
+        try
+        {
+            var liveCount = _db.Accounts.Count(x => x.Status == AccountSyncStatus.Ready);
+            if (liveCount == 0)
+            {
+                StatusTextBlock.Text = "No synced accounts to export.";
+                return;
+            }
+
+            var settings = _db.GetOrCreateSettings();
+            var sourcePath = AppPaths.ResolveAccountFilePath(settings.SourceFile);
+            var dialog = new Microsoft.Win32.SaveFileDialog
+            {
+                Title = "Export live accounts",
+                Filter = "Text files (*.txt)|*.txt|All files (*.*)|*.*",
+                DefaultExt = ".txt",
+                AddExtension = true,
+                OverwritePrompt = true,
+                FileName = "live-" + Path.GetFileName(sourcePath),
+                InitialDirectory = Path.GetDirectoryName(sourcePath)
+            };
+
+            if (dialog.ShowDialog(this) != true)
+                return;
+
+            var result = _accountExportService.SaveLive(
+                _db,
+                dialog.FileName,
+                settings.SourceFormat);
+
+            StatusTextBlock.Text =
+                "Exported " + result.AccountCount + " synced account(s) to " +
+                Path.GetFileName(result.FilePath) + ".";
+        }
+        catch (Exception ex)
+        {
+            System.Windows.MessageBox.Show(this,
+                ex.Message,
+                "Export live accounts failed",
                 System.Windows.MessageBoxButton.OK,
                 System.Windows.MessageBoxImage.Error);
         }
@@ -1937,12 +2090,6 @@ public partial class MainWindow : FluentWindow
         if (_previewMessage == null)
             return;
 
-        var openAccount = _selectedAccount?.Id == _previewMessage.AccountId
-            ? _selectedAccount
-            : _db.Accounts.FindById(_previewMessage.AccountId);
-        if (openAccount != null && !await EnsureAccessTokenCurrentAsync(openAccount))
-            return;
-
         // Bodies are downloaded on demand, so the selected message may still be in flight.
         var pending = _bodyFetch;
         if (pending != null)
@@ -1980,26 +2127,34 @@ public partial class MainWindow : FluentWindow
             _previewMessage = message;
             EnsureAccountForMessage(message);
 
+            var watch = Stopwatch.StartNew();
             var stored = _db.LoadMessageBody(message.Id);
+            var dbMs = watch.ElapsedMilliseconds;
             ShowPreview(message, stored);
 
-            var previewAccount = _selectedAccount?.Id == message.AccountId
-                ? _selectedAccount
-                : _db.Accounts.FindById(message.AccountId);
-            if (previewAccount != null && !await EnsureAccessTokenCurrentAsync(previewAccount))
-                return;
-
+            // Reading never waits for a token refresh: the body loader signs in with the
+            // stored token and only refreshes when the server has actually expired it.
             if ((message.BodyLoaded ||
                  !string.IsNullOrEmpty(stored.Text) ||
                  !string.IsNullOrEmpty(stored.Html)) &&
                 message.AttachmentInfoKnown)
             {
+                AppLog.Notice(
+                    "preview",
+                    "uid=" + message.Uid + " shown from database: db=" + dbMs +
+                    "ms ui=" + (watch.ElapsedMilliseconds - dbMs) + "ms" +
+                    (string.IsNullOrWhiteSpace(stored.Html) ? " text" : " html"));
                 StartNeighbourPrefetch(message);
                 return;
             }
 
             if (await FetchPreviewBodyAsync(message))
+            {
+                AppLog.Notice(
+                    "preview",
+                    "uid=" + message.Uid + " shown after download: total=" + watch.ElapsedMilliseconds + "ms");
                 StartNeighbourPrefetch(message);
+            }
         }
         catch (Exception ex)
         {
@@ -2017,10 +2172,6 @@ public partial class MainWindow : FluentWindow
     /// </summary>
     private void StartNeighbourPrefetch(MessageEntity anchor)
     {
-        if (_syncRunning || IsAccountSyncing(anchor.AccountId))
-            return;
-
-        var generation = Interlocked.Increment(ref _prefetchGeneration);
         var items = MessagesListView.Items.OfType<MessageEntity>().ToList();
         var index = items.IndexOf(anchor);
         if (index < 0)
@@ -2031,13 +2182,39 @@ public partial class MainWindow : FluentWindow
             .Where(m => m.AccountId == anchor.AccountId && (!m.BodyLoaded || !m.AttachmentInfoKnown))
             .Take(NeighbourPrefetchCount)
             .ToList();
+
+        StartPrefetch(anchor.AccountId, candidates);
+    }
+
+    /// <summary>
+    /// Once the session is warm, the top of the list is pulled in the background so the
+    /// first clicks are plain database reads. The list is newest-first, which is where the
+    /// operator looks.
+    /// </summary>
+    private void StartVisiblePrefetch(int accountId)
+    {
+        var candidates = MessagesListView.Items
+            .OfType<MessageEntity>()
+            .Where(m => m.AccountId == accountId && (!m.BodyLoaded || !m.AttachmentInfoKnown))
+            .Take(VisiblePrefetchCount)
+            .ToList();
+
+        StartPrefetch(accountId, candidates);
+    }
+
+    private void StartPrefetch(int accountId, List<MessageEntity> candidates)
+    {
+        if (_syncRunning || IsAccountSyncing(accountId))
+            return;
+
+        var generation = Interlocked.Increment(ref _prefetchGeneration);
         if (candidates.Count == 0)
             return;
 
-        var account = _selectedAccount?.Id == anchor.AccountId
+        var account = _selectedAccount?.Id == accountId
             ? _selectedAccount
-            : _db.Accounts.FindById(anchor.AccountId);
-        if (account == null || AccessTokenOlderThanOneHour(account))
+            : _db.Accounts.FindById(accountId);
+        if (account == null)
             return;
 
         List<ProxySpec> proxies;
@@ -2126,10 +2303,15 @@ public partial class MainWindow : FluentWindow
         PreviewLoadingOverlay.Visibility = Visibility.Visible;
         try
         {
+            var watch = Stopwatch.StartNew();
+            var coldWebView = PreviewWebView.CoreWebView2 == null;
             await EnsurePreviewWebAsync();
             if (!ReferenceEquals(_previewMessage, message))
                 return;
 
+            _previewRenderStarted = Stopwatch.GetTimestamp();
+            _previewRenderInitMs = watch.ElapsedMilliseconds;
+            _previewRenderColdWebView = coldWebView;
             _previewAwaitingNavigation = true;
             PreviewWebView.NavigateToString(MessageBodyDocument.Build(message, stored));
         }
@@ -2197,8 +2379,23 @@ public partial class MainWindow : FluentWindow
 
             _previewAwaitingNavigation = false;
             PreviewLoadingOverlay.Visibility = Visibility.Collapsed;
+
+            if (_previewRenderStarted != 0)
+            {
+                var renderMs = Stopwatch.GetElapsedTime(_previewRenderStarted).TotalMilliseconds;
+                _previewRenderStarted = 0;
+                AppLog.Notice(
+                    "preview",
+                    "html rendered: webview init=" + _previewRenderInitMs + "ms" +
+                    (_previewRenderColdWebView ? " (cold start)" : "") +
+                    " render=" + (long)renderMs + "ms");
+            }
         };
     }
+
+    private long _previewRenderStarted;
+    private long _previewRenderInitMs;
+    private bool _previewRenderColdWebView;
 
     private void OpenPreviewLink(string uri)
     {
@@ -2242,9 +2439,6 @@ public partial class MainWindow : FluentWindow
                 : _db.Accounts.FindById(message.AccountId);
 
             if (account == null)
-                return false;
-
-            if (!await EnsureAccessTokenCurrentAsync(account))
                 return false;
 
             var proxies = LoadProxies();
@@ -2580,6 +2774,8 @@ public partial class MainWindow : FluentWindow
             ReloadAccounts();
             ReloadFolders();
             ReloadMessages();
+            if (_selectedAccount != null)
+                ScheduleBodySessionWarmUp();
             _addressBook?.RefreshFromDatabase();
         }
         catch (OperationCanceledException)
@@ -2832,6 +3028,7 @@ public partial class MainWindow : FluentWindow
     {
         _searchDebounce.Stop();
         _accountFilterDebounce.Stop();
+        _sessionWarmupDebounce.Stop();
         _syncCancellation?.Cancel();
         foreach (var cancellation in _accountSyncCancellation.Values)
             cancellation.Cancel();
@@ -2845,7 +3042,7 @@ public partial class MainWindow : FluentWindow
         // give cancelled sync and body-fetch tasks a short window to unwind first.
         try
         {
-            var pending = new Task?[] { _activeSyncTask, _bodyFetch, _attachmentDownload, _prefetchTask, _sendTask }
+            var pending = new Task?[] { _activeSyncTask, _bodyFetch, _attachmentDownload, _prefetchTask, _sendTask, _sessionWarmupTask }
                 .Concat(_accountSyncTasks.Values)
                 .Where(task => task != null)
                 .Cast<Task>()

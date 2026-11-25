@@ -13,8 +13,11 @@ data/DB/
 data/attachments/
 data/webview2/
 data/runtime/WebView2Loader.dll
+data/mailclient.activation
 *.log
 *.log.previous-crash
+*.log.previous-run
+*.log.old
 
 # Working copies kept during development, not part of the product
 *.working.bak

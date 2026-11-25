@@ -480,7 +480,8 @@ internal sealed class MailDatabase : IDisposable
             existing.SeenCount += seed.SeenCount;
             existing.IsOwnAccount |= seed.IsOwnAccount;
 
-            if (existing.DisplayName.Length == 0 && seed.DisplayName.Length > 0)
+            // Rows written by older builds can carry a null name; never dereference it.
+            if (string.IsNullOrEmpty(existing.DisplayName) && !string.IsNullOrEmpty(seed.DisplayName))
                 existing.DisplayName = seed.DisplayName;
 
             if (seed.LastSeenUtc > existing.LastSeenUtc)

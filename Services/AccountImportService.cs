@@ -161,6 +161,7 @@ internal sealed class AccountImportService
             AccessTokenRefreshedAt = null,
             Site = site,
             AuthMode = AuthRouter.Detect(record.RefreshToken),
+            ImportedLineKind = record.LineKind,
             Status = AccountSyncStatus.Pending
         };
 
@@ -172,6 +173,7 @@ internal sealed class AccountImportService
         account.RefreshToken = record.RefreshToken;
         account.Site = site;
         AuthRouter.ApplyDetected(account, record.RefreshToken);
+        account.ImportedLineKind = record.LineKind;
         account.Status = AccountSyncStatus.Pending;
         account.LastError = null;
 

@@ -88,6 +88,14 @@
                                                FontSize="16"
                                                Foreground="#FFFFFF" />
                             </ui:Button>
+                            <ui:Button x:Name="SaveLiveAccountsButton"
+                                       Style="{StaticResource IconToolButtonLive}"
+                                       ToolTip="Export accounts that synced successfully. Each line is written in the format that account was imported in."
+                                       Click="SaveLiveAccounts_Click">
+                                <ui:SymbolIcon Symbol="Save24"
+                                               FontSize="16"
+                                               Foreground="#FF00FF41" />
+                            </ui:Button>
                         </StackPanel>
                         <TextBlock Text="ACCOUNTS"
                                    Style="{StaticResource SectionTitleText}"

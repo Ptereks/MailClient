@@ -39,11 +39,39 @@ public partial class App : Application
         WebView2NativeBootstrap.EnsureLoaderSearchPath();
         ApplicationThemeManager.Apply(ApplicationTheme.Dark, WindowBackdropType.None);
 
+        // The activation prompt is the first window shown, so WPF would make it MainWindow and
+        // OnMainWindowClose would end the process when it closes; hold explicit shutdown until
+        // the real main window exists.
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+        // Hardware-bound activation. A copied exe has a different machine id, so no existing
+        // code fits and this returns false until the owner issues a new one.
+        if (!PassActivation())
+        {
+            Shutdown(0);
+            return;
+        }
+
         await WebView2Warmup.StartAsync();
 
         var window = new MainWindow();
         MainWindow = window;
+        ShutdownMode = ShutdownMode.OnMainWindowClose;
         window.Show();
+    }
+
+    /// <summary>
+    /// Returns true when the copy is activated for this machine: either a stored code already
+    /// fits, or a valid one is entered now. A copied exe stays blocked until the owner issues a
+    /// code for the new machine id.
+    /// </summary>
+    private static bool PassActivation()
+    {
+        if (Activation.IsActivated())
+            return true;
+
+        var window = new ActivationWindow();
+        return window.ShowDialog() == true;
     }
 
     private static Mutex? _instanceMutex;
